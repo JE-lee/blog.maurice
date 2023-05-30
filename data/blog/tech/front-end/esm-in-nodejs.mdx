@@ -1,0 +1,135 @@
+---
+title: Node.js 中的 ESM
+date: '2023-05-31'
+tags: []
+draft: false
+summary: '在 node.js 中，如何使用 ES module'
+authors: []
+---
+
+从`v12.0.0`开始，`Node.js`开始添加对 ES Module 的支持，可能需要通过`--experimental-vm-modules`标识来开启这个特性。
+## node 将模块视为 ESM 进行加载的情况：
+
+1. `mjs`后缀的文件
+2. 当前 `package.json` 中设置 `type:module`, 则项目下所有的 js 模块都视为 esm。
+3. node cli 指定 `--input-type` 
+```bash
+node --input-type=module --eval "import { sep } from 'node:path'; console.log(sep);"
+```
+## ts-node 对 esm module 的支持
+```bash
+ts-node --esm ./hello.ts
+ts-node-esm ./hello.ts
+```
+
+## 在 VS code 中调试 ESM
+```json
+{
+  "version": "2.0.0",
+  "configurations": [
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug @core's file",
+      "program": "${fileDirname}/${fileBasenameNoExtension}.mts",
+      "runtimeArgs": [
+        "--loader",
+        "ts-node/esm"
+      ],
+      "cwd": "${workspaceRoot}/packages/core",
+      "sourceMaps": true,
+      "smartStep": true,
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+    },
+  ]
+}
+```
+
+## 使用 Jest 测试 ESM 模块
+
+1. install dependency
+```bash
+pnpm add @babel/core @babel/preset-env @babel/preset-typescript babel-jest ts-jest jest --save-dev
+```
+
+2. add jest.config.js
+```javascript
+/** @type {import('ts-jest').JestConfigWithTsJest} */
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  extensionsToTreatAsEsm: ['.ts'],
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
+  transform: {
+    // '^.+\\.[tj]sx?$' to process js/ts with `ts-jest`
+    // '^.+\\.m?[tj]sx?$' to process js/ts/mjs/mts with `ts-jest`
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        useESM: true,
+      },
+    ],
+  },
+}
+
+```
+
+3. add npm script
+```json
+{
+  "scripts": {
+    "test": "jest"
+  }
+}
+```
+## 对于 __esModule 的支持
+__esModule 用来解决`ES module`和`CommonJS`之间的互操作性问题。
+
+1. 在 CommonJS 模块中如果 `exports.__esModule = true`并且 `module.exports.default` 有值，那么在 ES Module 中导入该 CommonJS 模块, default import 对应的就是 module.exports.default
+2. 如果 `exports.__esModule=false`, 那么 default import 对应的就是 module.exports
+
+`tsc`, `babel`, `webpack`等打包编译工具都支持该约定。
+
+但是 `node ESM`并[不支持这个约定](https://github.com/nodejs/node/issues/40891)。
+> Hey, it looks like the module team consensus is to not do this so I'll go ahead and close the issue and Pr. Thanks a lot for the detailed request and implementation attempt.
+> If you would be interested in getting more involved there is a lot of interesting work to do in the modules space in Node. I encourage you to get involved in the discussions :)
+
+
+在 Node Native ESM 中，exports.default 只会被当成是普通的具名导出。其表现类似于 __esModule = false.
+```javascript
+Object.definePropety(exports, '__esModule', { value: true })
+const ratio = 12
+exports.default = ratio
+
+```
+```javascript
+import * as lib from './lib.cjs'
+import libDefault from './lib.cjs'
+
+console.log('libDefault', libDefault) // libDefault { default: 12 }
+console.log('lib', lib) // lib [Module] { __esModule: true, default: { default: 12 } }
+console.log('lib.default', lib.default) // lib.default { default: 12 }
+console.log('lib.default.default', lib.default.default) // lib.default.default 12
+
+```
+_**这就可能会导致一些包无法在原生的 ESM 环境中使用**_，例如[ async-validator](https://github.com/yiminghe/async-validator/issues/312)
+解决的方法是
+
+1. 使用 babel 打包
+2. 使用工具函数处理该情况
+```typescript
+export function interopImportCJSDefault<T>(d: T): T {
+  return d && (d as DefaultWrapper<T>).__esModule
+    ? (d as DefaultWrapper<T>).default
+    : d;
+}
+
+type DefaultWrapper<T> = T & { default: T; __esModule?: boolean };
+
+import AsyncValidator from 'async-validator'
+const ValidateSchema = interopImportCJSDefault(AsyncValidator)
+```
+
