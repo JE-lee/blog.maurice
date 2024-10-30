@@ -1,0 +1,211 @@
+---
+title: Webfont 和 CLS
+date: '2024-10-29'
+tags: []
+
+draft: false
+summary: '如何减少 webfont 对 CLS 的影响'
+authors: []
+---
+
+## 介绍
+
+CLS (cumulative layout shift) 是一个用来衡量页面视觉稳定性的 web vitas 指标。CLS 的值越高，说明页面稳定性越差。
+在用户加载页面内容的过程中，用户的阅读体验和操作遭到打断，造成困惑，或者因为页面元素的突然跳动误点击。
+这些都会造成用户体验的下降，也影响网站的专业性和形象。
+
+<Image alt="CLS score bar" src="/static/images/tech/cls-score-bar.webp" width={1694} height={938} />
+
+在下载 webfont 的过程中，浏览器会使用 fallback font 来渲染文本，等到 webfont 字体下载完成后，再切换为目标字体渲染。
+在这一过程中，用户先后看到的是由两种不同字体渲染的内容。不同的字体渲染所需要的空间是不一样的，这就会导致同样的文本前后渲染的大小是不一样的，从而影响页面中其他元素的布局，造成页面元素位置的突变。
+
+<div className="flex justify-center">
+  <Image
+    alt="cls caused by webfont"
+    src="/static/gif/tech/cls-caused-by-webfont.gif"
+    width={494}
+    height={648}
+  />
+</div>
+
+上述现象就是 FOUT (FLash Of Unstyled Text).
+
+如果将 webfont 字体声明为 `font-display: block`， 那么在加载过程中，用户先是完全看不到内容，然后等到字体加载完成后，才能看到具体的内容。
+这就是 FOIT （Flash Of Invisible Text） 问题。
+一般我们都不会设置为 `block`， 因为 FOIT 比 FOUT 的用户体验更差。
+
+## webfont 导致 CLS 的原因
+
+为什么两种不同的字体渲染相同的内容所需要的空间大小是不一样的？
+这和字体设计的参数指标有关系。不同字体的 `Ascent`, `Descent`, `CapHeight`, `xWidthAvg` 都是不一样的，因此渲染单个字符所需要的高度和宽度也是不一样的。
+
+<div className="flex justify-center">
+  <Image
+    alt="different font"
+    src="/static/images/tech/different font.png"
+    width={1078}
+    height={570}
+  />
+</div>
+
+下面是 `Victor Mono` 字体的粗略的 font metrics, 来自于[Capsize](https://seek-oss.github.io/capsize/)。
+
+Capsize 允许你查看一系列 webfont 如google font 的 metrics, 同时允许你从本地字体文件中获得 font metircs。
+
+<div className="flex justify-center">
+  <Image alt="Victor Mono measurements" src="/static/images/tech/Victo-Mono-measurements.png" width={1184} height={628} />
+</div>
+```js
+{
+  familyName: "Victor Mono",
+  fullName: "Victor Mono Regular",
+  postscriptName: "VictorMono-Regular",
+  capHeight: 800,
+  ascent: 1100,
+  descent: -250,
+  lineGap: 0,
+  unitsPerEm: 1000,
+  xHeight: 618,
+  xWidthAvg: 600,
+  subsets: {
+    latin: {
+      xWidthAvg: 600
+    },
+    thai: {
+      xWidthAvg: 600
+    }
+  }
+}
+
+````
+
+其中几个关键指标的意义是
+
+* **capHeight**：指的是大写字母的高度，例如 "H" 或 "I" 的高度。单位是与字体的 unitsPerEm 比例有关的单位（例如： 1100 / 1000）。这个值通常用于计算文本的对齐和排版。
+
+* **ascent**：字体基线（baseline）以上的最大高度，表示字形顶部与基线的距离。在这里，1854 表示从基线向上的度量值。
+
+* **descent**：字体基线以下的最大深度，通常用于描述字母（如 "p" 或 "y"）的下方部分。在这里，-250 表示从基线向下的度量值。
+
+* **xWidthAvg**：字体平均字符宽度的度量，用于评估字体宽度的标准大小。这对排版系统中行宽和文本流的计算非常有用。在这里，平均字符宽度为 600。
+
+当 `line-height: normal` 的时候，字体的高度取决 accent, decent 部分的大小。所以不同字体的 `line-height: normal` 设置的高度都会不同。
+
+当 `line-height` 设置确定值，如百分比，具体像素值的时候，accent，decent 的作用就会被覆盖掉，也就是说此时不同字体的 line-height 都是一样的。
+
+`xWidthAvg` 是一个平均宽度，我们并不能简单的通过 xWidthAvg * count 来计算一段文字的精确宽度，除非是等宽字体，但是可以据此粗略估算。
+
+## 如何减少 webfont 对 CLS 的影响
+
+1. 使用 `font-display: swap`; 而不是 `font-display: block`;
+
+2. 使用更相似的系统字体作为 fallback font。
+
+<div className="flex justify-center">
+  <Image alt="better fallback font" src="/static/images/tech/better-fallback-font.png" width={1184} height={628} />
+</div>
+
+这个网站[modernfontstacks.com](https://modernfontstacks.com/)收录了被各个操作系统都广泛支持的系统字体。
+
+3. 调整字体指标 （Adjust font metrics）
+
+利用 `size-adjust`, `ascent-override`, `descent-override` 来让 fallback font 更接近目标字体的设计指标。
+
+```css
+font-face {
+  font-family: "My fallback font";
+  /* Courier New closely matches Victor Mono */
+  src: local("Courier New");
+  ascent-override: 110%;
+  descent-override: 25%;
+}
+
+.web-font {
+  font-family: "Victor Mono", "My fallback font";
+}
+````
+
+上面 ascent-override 和 descent-override 是这样计算的，公式如下：
+
+```text
+ascent-override = ascent / unitsPerEm
+descent-override = descent / unitsPerEm
+```
+
+因为这里 `Victor Mono` 和它的 falllback font `Courier New` 都是等宽字体，所以只调整 ascent 和 descent 就可以让它们近似相似(空间意义上)。
+
+如果是其他非等宽字体之间 metrics 的调整，则还可能涉及到 `line-gap`, `size-adjust`，这里面的计算就会比较复杂。
+
+这时我们可以借助 `Capsize` 这个工具。
+
+```javascript
+import { createFontStack } from '@capsizecss/core'
+import VictorMono from '@capsizecss/metrics/victorMono'
+import courierNew from '@capsizecss/metrics/courierNew'
+
+const { fontFamily, fontFaces } = createFontStack([VictorMono, courierNew])
+console.log('fontFamily: ', fontFamily)
+console.log('fontFaces: ', fontFaces)
+
+// output:
+// fontFamily: "Victor Mono", "Victor Mono Fallback", "Courier New"
+// fontFaces: @font-face {
+//   font-family: "Victor Mono Fallback";
+//   src: local('Courier New'), local('CourierNewPSMT');
+//   ascent-override: 110.0179%;
+//   descent-override: 25.0041%;
+//   size-adjust: 99.9837%;
+// }
+```
+
+只需要在所有样式之前定义 fallback font（上面的 @font-face）, 然后在使用 webfont 的地方加上后备字体声明。
+
+```css
+@font-face {
+  font-family: 'Victor Mono Fallback';
+  src: local('Courier New'), local('CourierNewPSMT');
+  ascent-override: 110.0179%;
+  descent-override: 25.0041%;
+  size-adjust: 99.9837%;
+}
+
+.webfont {
+  family: 'Victor Mono', 'Victor Mono Fallback', 'Courier New';
+}
+```
+
+## 测量和优化
+
+让我们看一下调整后的 fallback font 的 CLS 得分：
+
+调整前的 CLS 为 0.029。因为我们的 demo 比较简单，所以这里 0.029 很小。但这不重要，我们主要关注前后的数值的变化。
+
+<div className="flex justify-center">
+  <Image
+    alt="courier-new-fallback-font"
+    src="/static/images/tech/courier-new-fallback-font.png"
+    width={1184}
+    height={628}
+  />
+</div>
+
+调整后的 CLS 为惊人的 0.001，这说明我们的优化是有效的。我们确实减轻了 webfont 造成的 CLS 影响。
+
+<div className="flex justify-center">
+  <Image
+    alt="courier-new-fallback-font"
+    src="/static/images/tech/victor-mono-fallback-font.png"
+    width={1184}
+    height={628}
+  />
+</div>
+
+**注意：非等宽字体的优化可能没有上述结果那么令人震撼。**
+
+## 结论
+
+webfont 在加载完成前后，浏览器使用两种字体(fallback) 来渲染内容。不同字体间因为设计指标的上的差异，需要的渲染的空间是不一样的。
+
+所以在这一过程中，用户可能经历页面元素大小和布局突变的过程，造成严重的 CLS 问题。
+
+通过设置系统 fallback font, 并且调整 fallback font 的 metrics， 来尽量抹平两种字体之间渲染的差异，从而减轻或者消除其带来的 CLS 的问题。
