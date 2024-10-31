@@ -14,7 +14,7 @@ import localFont from 'next/font/local'
 
 // 霞鹜文楷
 const xiawu_wenkai = localFont<'--font-xiawu-wenkai'>({
-  src: './LXGWWenKaiScreen.woff2',
+  src: './xai-wu-wen-kai-screen-subset.woff2',
   display: 'swap',
   variable: '--font-xiawu-wenkai',
 })

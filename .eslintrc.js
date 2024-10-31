@@ -39,4 +39,13 @@ module.exports = {
     '@typescript-eslint/no-var-requires': 'off',
     '@typescript-eslint/ban-ts-comment': 'off',
   },
+  overrides: [
+    {
+      files: ['./scripts/fontsubset.mjs'],
+      globals: {
+        argv: 'readonly',
+        minimist: 'readonly',
+      },
+    },
+  ],
 }
