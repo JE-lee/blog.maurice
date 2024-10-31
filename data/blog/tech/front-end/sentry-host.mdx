@@ -1,14 +1,17 @@
 ---
 title: Host your sentry
 date: '2023-05-30 18:43'
-tags: []
+tags: ['web performance']
 draft: false
 summary: '部署一个自己的 sentry 服务'
 authors: []
 ---
 
+<TOCInline toc={props.toc} />
+
 sentry 私有化部署记录：
-> centos 7 
+
+> centos 7
 > docker: 20.10.12
 > docker-compose 1.29.2
 > pthon3 3.6.8
@@ -18,6 +21,7 @@ sentry 私有化部署记录：
 ## 环境准备
 
 1. 安装docker 参考：[https://docs.docker.com/engine/install/centos/](https://docs.docker.com/engine/install/centos/)
+
 ```bash
 sudo yum install -y uum-utils
 sudo yum-config-manager --add-repo  https://download.docker.com/linux/centos/docker-ce.repo
@@ -25,6 +29,7 @@ sudo yum install docker-ce docker-ce-cli containerd.io
 ```
 
 2. 安装 docker-compose 参考：[https://docs.docker.com/compose/install/](https://docs.docker.com/compose/install/)
+
 ```bash
 sudo curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
@@ -32,6 +37,7 @@ sudo ln -s /usr/local/bin/docker-compose /usr/bin/docker-compose
 ```
 
 3. 安装 python3
+
 ```bash
 sudo yum install epel-release
 sudo yum install -y python36
@@ -39,6 +45,7 @@ phton3 -version
 ```
 
 4. 如果内存太小（< 4G），则加大交换区内存或者启用交换区内存
+
 ```bash
 # 分配文件预留空间
 sudo fallocate -l 4G /swapfile
@@ -57,8 +64,11 @@ free -m
 # 卸载交换分区
 sudo swapoff /swapfile
 ```
+
 ## 安装 sentry
+
 sentry 可以私有化部署，官方部署的脚本在这个[仓库](https://github.com/getsentry/self-hosted/releases)中。需要先下载部署脚本到服务器，然后执行其中的 `install.sh`
+
 ```bash
 cd /work/sentry
 # 以sentry 22.3.0 版本为例子
@@ -69,7 +79,9 @@ tar -zxvf sentry.22.3.0.tar.gz -C sentry.22.3.0
 # 但是我这里为了方便，直接赋予 sentry 文件夹下面所有的脚本有执行权限了。
 chmod -R 0777 .
 ```
-如果你的 cpu core < 4, memory < 8G , 可以修改./install/_min-reqirements.sh 中的限制
+
+如果你的 cpu core < 4, memory < 8G , 可以修改./install/\_min-reqirements.sh 中的限制
+
 ```javascript
 # Don't forget to update the README and othes docs when you change these!
 MIN_DOCKER_VERSION='19.03.6'
@@ -79,10 +91,13 @@ MIN_RAM_SOFT=4800 # MB
 MIN_CPU_HARD=1
 MIN_CPU_SOFT=2
 ```
+
 然后执行 install.sh
+
 ```bash
 sudo bash ./install.sh
 ```
+
 ## 配置
 
 执行完 install.sh 之后，你的机器就已经有了 sentry 所需要的所有镜像和network了，这时候就可以启动了
@@ -90,6 +105,7 @@ sudo bash ./install.sh
 
 如果需要邮件提醒或者邀请成员，那么还需要设置邮件。
 以QQ邮件代理为例（其他邮箱同理）
+
 ```yaml
 ###############
 # Mail Server #
@@ -107,17 +123,17 @@ mail.use-ssl: true # 启用 ssl
 #       through SENTRY_MAIL_HOST in sentry.conf.py so remove those first if
 #       you want your values in this file to be effective!
 
-
 # The email address to send on behalf of
-mail.from: 'xxxx@qq.com' 
+mail.from: 'xxxx@qq.com'
 
 # The mailing list namespace for emails sent by this Sentry server.
 # This should be a domain you own (often the same domain as the domain
 # part of the `mail.from` configuration parameter value) or `localhost`.
 mail.list-namespace: 'qq.com'
-
 ```
+
 同时还需要注释掉一些环境变量
+
 ```yaml
 ########
 # Mail #
@@ -125,14 +141,17 @@ mail.list-namespace: 'qq.com'
 
 # SENTRY_OPTIONS["mail.list-namespace"] = env('SENTRY_MAIL_HOST', 'localhost')
 # SENTRY_OPTIONS["mail.from"] = f"sentry@{SENTRY_OPTIONS['mail.list-namespace']}"
-
 ```
+
 此时你就可以执行 `docker-compose up -d`来启动 sentry 服务了，启动过程中会要求你先创建一个 admin 账户，记得一定要创建，否则后面可能会报错。
 
 如果你修改了 sentry/config.yml 或者其他文件，想要生效就得重新启动sentry.
+
 ```bash
 docker-compose down
 docker-compose up -d
 ```
+
 ## 访问
+
 启动后你就可以在 9000 端口访问到你的 sentry 了，这时候就可以用上面的账号登录了。
