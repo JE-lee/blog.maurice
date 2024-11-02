@@ -203,6 +203,31 @@ console.log('fontFaces: ', fontFaces)
 
 **注意：非等宽字体的优化可能没有上述结果那么令人震撼。**
 
+## 使用 next/font
+
+`next/font` 提供了对 `google font` 或者 `local font` 后备字体优化的默认支持💥。
+
+```javascript
+// 霞鹜文楷
+const xiawu_wenkai =
+  localFont <
+  '--font-xiawu-wenkai' >
+  {
+    src: './xai-wu-wen-kai-screen-subset.woff2',
+    display: 'swap',
+    variable: '--font-xiawu-wenkai',
+  }
+
+export default function rootLayout() {
+  return (
+    <html
+      className={xiawu_wenkai.variable}
+      style={{ fontFamily: 'var(--font-xiawu-wenkai)' }}
+    ></html>
+  )
+}
+```
+
 ## 结论
 
 webfont 在加载完成前后，浏览器使用两种字体(fallback) 来渲染内容。不同字体间因为设计指标的上的差异，需要的渲染的空间是不一样的。

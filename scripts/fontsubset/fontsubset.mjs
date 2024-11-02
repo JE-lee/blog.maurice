@@ -3,6 +3,7 @@
 import { $, chalk, glob } from 'zx'
 import fs from 'fs'
 import { resolve } from 'path'
+import FontMin from 'fontmin'
 
 const inRoot = (path) => resolve(__dirname, '../../', path)
 const store = inRoot('data')
@@ -35,8 +36,15 @@ async function subsetFont() {
 
   console.log(chalk.blue('Unique characters written to file! ', chalk.green(charSet.size)))
 
+  // await $`pyftsubset ${inRoot(fontPath)} --output-file=${inRoot(output)} --text=${uniqueChars}`
   // Subset the font
-  await $`pyftsubset ${inRoot(fontPath)} --output-file=${inRoot(output)} --text=${uniqueChars}`
+  const fontMin = new FontMin()
+    .src(fontPath)
+    .use(FontMin.glyph({ text: uniqueChars, hinting: false }))
+    .use(FontMin.ttf2woff2())
+
+  const minFiles = await fontMin.runAsync()
+  await fs.promises.writeFile(output, minFiles[1].contents)
 
   console.log(chalk.blue('Font subset complete!'))
 }
@@ -44,7 +52,6 @@ async function subsetFont() {
 async function commit() {
   const statusText = await $`git status --porcelain`
 
-  const raw = statusText.text()
   const changedFiles = statusText
     .text()
     .split('\n')

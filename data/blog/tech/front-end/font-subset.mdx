@@ -1,0 +1,56 @@
+---
+title: Font Subset
+date: '2024-10-31'
+tags: ['web performance']
+draft: false
+summary: '如何减少 webfont 对 CLS 的影响'
+authors: []
+---
+
+<TOCInline toc={props.toc} />
+
+对于中文来说，因为其庞大的字符数量，字体文件一般都很大，可能达到了10M+。这极大地影响了页面的加载速度和呈现效果。
+
+那么有什么办法优化呢？
+
+首先，一个中文字体里面包含的字符数量可能有几万个，这其中包括了很多不常用的字符和生僻字。
+而我们的网页其实压根用不到这些字符。据统计，常用的中文字符也就是 3000 到 5000 个这个量级。
+所以我们可以采取的有效缩减字体文件大小的方法是，将字体文件子集化，剔除没有用到的字符。
+
+1. 安装 fonttools 工具
+
+```bash
+brew install python@.3.9.3
+brew install fonttools
+```
+
+2. 提取需要的字符。
+
+3. 使用 `fonttools` 的 `pyftsubset` 工具生成字集字体文件。
+
+```bash
+pyftsubset ./LXGWWenKaiScreen.ttf --output-file=public/fonts/subset-font.woff2 --text="你好世界"
+```
+
+**CI/CD**
+
+如果想要将上面的流程集合进 CI/CD 系统中，一个比较大的问题是 `fonttools` 是 python 的一个工具，和我们的工作流不是很契合。
+
+<del>此时，可以使用 node.js 的 `fontkit` 包来完成 font subsetting 的工作。</del>
+<del>fontkit 虽然可以创建 subset， 但是还不支持保存为单个文件。</del>
+
+> Currently, subsets produce minimal fonts designed for PDF embedding that may not work as standalone files. They have no cmap
+> tables and other essential tables for standalone use. This limitation will be removed in the future.
+
+经过搜索，我发现这个包 `fontmin` 可以满足我的需求，是用 node.js 完成 font subsetting。
+
+```javascript
+const uniqueChars = '你好世界'
+const fontMin = new FontMin()
+  .src(fontPath)
+  .use(FontMin.glyph({ text: uniqueChars, hinting: false }))
+  .use(FontMin.ttf2woff2())
+
+const minFiles = await fontMin.runAsync()
+await fs.promises.writeFile(output, minFiles[1].contents)
+```
