@@ -62,6 +62,7 @@ async function commit() {
     // 清空 git staged 区
     await $`git reset -q HEAD`
     await $`git add ${inRoot(output)}`
+    await $`git add ${inRoot('./scripts/fontsubset/unique-chars.txt')}`
     await $`git commit -m "chore: update font subset"`
   }
 }
