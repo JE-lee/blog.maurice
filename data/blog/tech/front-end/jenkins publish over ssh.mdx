@@ -1,0 +1,95 @@
+---
+title: jenkins publish over ssh
+date: '2023-11-02'
+tags: ['web']
+draft: false
+authors: []
+---
+
+## docker 部署 jenkins
+
+使用 docker 启动 [jenkins](https://github.com/jenkinsci/docker/blob/master/README.md)
+
+```bash
+docker run -d -p 8080:8080 -p 50000:50000 jenkins/jenkins:lts-jdk11
+```
+
+然后访问 `host:8080`进入欢迎页面，一开始，jenkins会要求你输入密钥。这个密钥存在 jenkins 容器里的以下位置。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2022/png/438262/1648567279637-bfed5901-617a-4d26-b14f-12369d5d74ab.png"
+    fill={true}
+  />
+</div>
+
+接着你就可以创建第一个管理员账户。
+
+## publish over ssh
+
+在插件管理页面选中安装。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2022/png/438262/1648574021717-55fd413c-f67b-4ab1-a1fb-33f365309582.png"
+    fill={true}
+  />
+</div>
+
+### 全局配置
+
+然后在系统配置中，找到 publish over ssh 版块（在安装了该插件自动会出现），配置对应的要发布的 server.
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2022/png/438262/1648574196806-28bc2bfa-c177-47a9-ad12-af4d68e9ed6a.png"
+    fill={true}
+  />
+</div>
+
+如果发布服务器配置了[免密码登录](https://segmentfault.com/a/1190000023074072)
+
+那么你可以将认证私钥配置在这里。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2022/png/438262/1648574330993-3353d8f7-1b0a-48c5-99aa-d223774345c7.png"
+    fill={true}
+  />
+</div>
+
+**注意**：jenkins 现在的版本 （v2.x）不支持太高的加密算法版本。
+
+可根据下面的命令生成密钥对。
+
+```bash
+ssh-keygen -m PEM -t rsa -b 4096 -C "xxx@xxx.com"
+```
+
+### 项目配置
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2022/png/438262/1648574609886-843242be-6c0a-4b1a-8f92-6e9a40359d28.png"
+    fill={true}
+  />
+</div>
+
+1. SSH Server 指定为`sit`, 就是全局配置中的 sit。
+2. Source files 中只能是相对路径，相对于当前 `$WORKSPACE`. `**/*` 表示的是当前 workspace 下所有的文件，不包括 `.git`。
+3. Remote directory 也是一个相对路径，哪怕你指定为 `/work`的形式，其最后的目标路径是 `global remote directory`+ `project remote directory`. 如果你的`global remote directory`没有配置或者为空，那么就是登录目标服务器的用户目录。例如我们配置的 ssh 登录用户是 root，那么此时的目标路径就是 `/root` + `project remote directory`。

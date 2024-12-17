@@ -1,0 +1,288 @@
+---
+title: 最近值得记录的一些小尝试
+date: '2023-07-26'
+tags: ['web']
+draft: false
+authors: []
+---
+
+最近写了一个休息提醒的 PWA 的应用，用来设定工作一段时间后，提醒我要休息了。有点类似于番茄时钟。
+应用地址是[这个～](https://pomodoro-clock-pwa.vercel.app/)。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690291909922-bca25574-b801-4ae6-b6ee-d32d86a0efe2.png"
+    fill={true}
+  />
+</div>
+
+它的功能包括：
+
+- 工作倒计时结束后，会通过浏览器 Notification 通知到我
+  <div className="relative h-[400px]">
+    <Image
+      style={{ objectFit: 'contain' }}
+      className="my-0"
+      alt="fiddler screenshot"
+      src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690292100204-05f321ef-9f3d-4fa4-acf9-a931b26dacad.png"
+      fill={true}
+    />
+  </div>
+- 可以设定每次的工作时长，休息时长，提示语。
+  <div className="relative h-[400px]">
+    <Image
+      style={{ objectFit: 'contain' }}
+      className="my-0"
+      alt="fiddler screenshot"
+      src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690292163537-49c9ca8f-ae72-46cc-ad86-a89c23335006.png"
+      fill={true}
+    />
+  </div>{' '}
+- 查看当前年的工作/休息热力图
+  <div className="relative h-[400px]">
+    <Image
+      style={{ objectFit: 'contain' }}
+      className="my-0"
+      alt="fiddler screenshot"
+      src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690292247266-95cd59df-4039-4b1e-bd84-0c8c5a406a0a.png"
+      fill={true}
+    />
+  </div>{' '}
+
+最开始我在网上找了一些休息提醒的应用，但是都不太满意，于是想着就自己写一个。正好可以应用一些新技术，比如说 react，pwa， google analytics，离线应用等。
+
+## React
+
+工作以来使用的前端框架一直都是 Vue，React 比较少用到。这次使用 Create React App + TypeScript + react hooks 作为主要的技术栈。我的感受是，react hooks 比 Vue 难多了。如果你没有领悟 `对于 react functional component 来说，运行这个函数只是得到当前帧` 这一层的话，是很难理解 hooks 的。
+
+## Eslint
+
+在这个项目中，我尝试不再使用`prettier`来格式化我的代码。而是将`code style`这一部分的工作也交给 eslint 来做。缘由可以看下这篇文章 「[为什么我不使用 Prettier](https://antfu.me/posts/why-not-prettier-zh)」。主要有以下几点
+
+1. prettier 预设的 code style 很好，但是想要在这上面个性化却很难。
+2. 有时候只是修改了一点点东西，却触发了最大长度强制换行。这在 git diff 视图中很困扰。
+   {' '}
+   <div className="relative h-[400px]">
+     <Image
+       style={{ objectFit: 'contain' }}
+       className="my-0"
+       alt="fiddler screenshot"
+       src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690293377150-2e9767a3-cc1d-4d43-9d01-0a5017d2e663.png"
+       fill={true}
+     />
+   </div>{' '}
+3. 和 eslint 有些功能配置存在冲突。
+4. eslint 和 prettier 需要两个不同的 parser，对机器也是一种负担。
+
+因此，作者认为使用 prettier 不是特别必需，eslint 也可以承担这部分的工作，并且更自由。
+他也开源了他自己的[预设集](https://github.com/antfu/eslint-config)。
+
+我也尝试在项目中使用这个 eslint 规则集合。
+
+```json
+{
+  "eslintConfig": {
+    "extends": [
+      "@antfu/eslint-config-ts",
+      "plugin:react-hooks/recommended",
+      "plugin:react/recommended"
+    ],
+    "rules": {
+      "jsx-quotes": ["error", "prefer-double"],
+      "react/react-in-jsx-scope": "off",
+      "no-debugger": "off",
+      "no-restricted-syntax": "off",
+      "no-console": "off",
+      "no-new": "off"
+    }
+  }
+}
+```
+
+整体使用下来，还是有几处地方的 code style 做的不好（也许配置好对应的 eslint 规则就可以满足）
+
+1. 链式调用没有要求换行，看起来不直观。
+   <div className="relative h-[400px]">
+     <Image
+       style={{ objectFit: 'contain' }}
+       className="my-0"
+       alt="fiddler screenshot"
+       src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690294013662-c2063267-ac09-4248-a92b-f09014103380.png"
+       fill={true}
+     />
+   </div>{' '}
+2. 对于 jsx ，没有设置好的 code style 规则。className 可以写很长很长，不好看，需要手动调整。如果是 prettier 的话，会自动格式化好标签的属性，看起来就比较舒服。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690294129875-cdde1063-44b3-473a-b092-bfcfaa23b3f2.png"
+    fill={true}
+  />
+</div>{' '}
+
+其他体验都挺好。
+
+## PWA
+
+create-react-app 创建的项目默认都是配置好 manifest.json 的，发布后就可以点击地址栏的`安装到本地`按钮安装到本地了。这时候还没有离线能力，还需要配合 Service Workder 来缓存资源。不多说，直接使用 google 自家完善的解决方案 `webbox`。
+
+1. 初始化 webbox 配置文件
+
+```bash
+npx workbox wizard
+```
+
+2. 配置 webbox
+
+```javascript
+module.exports = {
+  globDirectory: 'build/',
+  globPatterns: ['**/*.{json,png,ico,html,txt,css,js}'],
+  swDest: 'build/sw.js',
+  ignoreURLParametersMatching: [/^utm_/, /^fbclid$/],
+  runtimeCaching: [
+    {
+      urlPattern: /\.html$/,
+      // 首页文件不能配置 expiration seconds,
+      // 会导致如果时间没有过期就会一直使用缓存中的文件
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'entry',
+      },
+    },
+    {
+      urlPattern: /\.(?:css|js|png|gif)$/,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'all',
+        expiration: {
+          maxEntries: 20,
+          maxAgeSeconds: 7 * 24 * 60 * 60, // 7 天
+        },
+      },
+    },
+  ],
+}
+```
+
+webbox 的缓存策略有：
+
+- CacheOnly
+- CacheFirst
+- NetworkOnly
+- NetworkFirst
+- StaleWhileRevalidate
+
+前面四个都比较好理解，最后一个是最复杂的，工作流程大概如下：
+
+> 1. On the first request for an asset, fetch it from the network, place it in the cache, and return the network response.
+> 2. On subsequent requests, serve the asset from the cache first, then "in the background," re-request it from the network and update the asset's cache entry.
+> 3. For requests after that, you'll receive the last version fetched from the network that was placed in the cache in the prior step.
+
+3. 生成 sw.js
+
+```bash
+pnpm add webbox-cli -D
+workbox generateSW workbox-config.js
+```
+
+4. 注册 sw.js
+
+```javascript
+import { Workbox } from 'workbox-window'
+
+if (process.env.NODE_ENV === 'production') {
+  if ('serviceWorker' in navigator) {
+    const wb = new Workbox('/sw.js')
+
+    wb.addEventListener('waiting', () => {
+      // 当有新的版本安装的时候，立马跳过等待，让其生效。
+      // 否则直到所有使用该 sw 的tab 都关闭后才生效。
+      wb.messageSkipWaiting()
+    })
+
+    wb.addEventListener('controlling', () => {
+      // 当新版本的 service workder 生效的时候，reload 页面，应用新的缓存。
+      window.location.reload()
+    })
+
+    wb.register()
+  }
+}
+```
+
+## Sentry
+
+感觉外国人做的东西都比较好 🤣。
+
+试用了 Sentry Cloud，接入步骤如下：
+
+1. 首先在 sentry.io 创建项目
+2. 安装 cli
+
+```bash
+pnpm add @sentry/cli -D
+```
+
+3. 构建之后上传 sourcemap
+
+```bash
+sentry-cli sourcemaps inject --org maurice-rk --project pomodoro-clock-pwa ./build && sentry-cli sourcemaps upload --org maurice-rk --project pomodoro-clock-pwa ./build
+```
+
+直接就可以进行应用错误监控啦
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690296896993-9e40c639-5da3-4e07-a9dd-9dbd2282ce2e.png"
+    fill={true}
+  />
+</div>{' '}
+
+sentry 不仅支持前端应用，也支持 node.js 应用，其他语言也支持。
+
+## Daisy ui
+
+基于 tailwindcss的，纯 html/css 的组件库。
+
+## Tailwindcss
+
+原子化 css 框架。
+
+1. 初始化配置文件。
+
+```bash
+npm install -D tailwindcss postcss autoprefixer
+npx tailwindcss init
+```
+
+2. 在 css 中添加 Tailwind 指令
+
+```css
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+在 css 中，`@tailwind`是合法的，属于 [at-rule](https://developer.mozilla.org/en-US/docs/Web/CSS/At-rule)。它需要进一步被 PostCss 处理。这个项目是用 Create-React-App 创建的，默认的 react-scripts 就已经配置好了 postcss 的 tailwindcss plugin。
+
+前提是在项目根目录下面，有 tailwind.config.js 这个配置文件。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690339448415-c7ba275d-f3aa-4a0a-8695-568add6528bc.png"
+    fill={true}
+  />
+</div>{' '}

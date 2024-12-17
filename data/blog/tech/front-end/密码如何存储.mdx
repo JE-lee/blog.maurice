@@ -1,0 +1,138 @@
+---
+title: 密码如何存储
+date: '2022-05-05'
+tags: ['web']
+draft: false
+authors: []
+---
+
+**用户的密码如何存储在数据库中？**
+
+**明文存储：**
+
+被拖库后黑客可以直接拿着明文的密码去入侵用户在其他网站/服务的账户（大部分人会在各处使用相同的密码），这不仅关乎自己网站的安全，也关系到用户的安全。
+
+**hash：**
+
+> 将任意长度的输入通过特定的散列函数转化得到一个固定长度的长度输出，这个输出的值就是 hash。这种转换的特点是**压缩映射**和**不可逆**。我们无法从将 hash 值还原为原始信息。常见的 hash 算法有 MD5, sha1, sha256, sha512等等。
+
+转换出来的 hash 和原数据的每一个字节都有十分紧密的关系，通常来说不同的输入得到的是不同的 hash 值，但是也有较小的概率不同的输入会得到相同的输出。
+
+```javascript
+key1 != key2
+hash(key1) == hash(key2)
+```
+
+这样情况叫做 `hash 碰撞` 。
+
+不同的 hash 算法碰撞的概率不相同，像 sha256 和 sha512 就拥有比较好的碰撞概率。
+
+在存储用户密码的时候，将明文密码使用散列函数映射为对应的 hash，存储在数据库中，可以起到隐藏密码信息的效果（不可逆性）。验证密码的时候则是将用户输入的密码用相同的 hash 算法转换后，和数据库中的 hash 值进行比较，一致则为密码正确。
+
+**加盐：**
+
+[read more](https://www.cnblogs.com/zhangxiaolei521/p/5814598.html)
+
+将密码使用 hash 算法转换后存储，依然不能保证其安全性。黑客依然可以通过**查表法**或者**彩虹表**得到原始的密码。
+
+> **彩虹表**是一个用于[加密散列函数](https://baike.baidu.com/item/%E5%8A%A0%E5%AF%86%E6%95%A3%E5%88%97%E5%87%BD%E6%95%B0)<
+> 逆运算的预先计算好的表, 为破解密码的散列值（或称哈希值、微缩图、摘要、指纹、哈希密文）而准备。一般主流的彩虹表都在100G以上.
+
+加盐可以使的这种攻击变得难以进行。
+
+```javascript
+hash("hello") = 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+hash("hello" + "QxLUF1bgIAdeQX") = 9e209040c863f84a31e719795b2577523954739fe5ed3b58a75cff2127075ed1
+hash("hello" + "bv5PehSMfV11Cd") = d1d3ec2e6f20fd420d50e2642992841d8338a314b8ea157c9e18477aaef226ab
+hash("hello" + "YYLmfY6IehjZMQ") = a49670c3c18b9e079b9cfaf51634f563dc8ae3070db2c4a8544305df1b60f007
+```
+
+此时数据库中需要存储两个字段，hash 和 salt。
+
+验证密码的时候需要将用户输入的密码和对应的 salt 一起进行转换得到 hash，并且与数据库中的 hash 进行比较。
+
+由于每一个 hash 都使用了不同的 salt 值，那么黑客想要通过彩虹表的方式攻击，就需要针对每一个 salt 都生成一个完整的彩虹表。
+
+**加盐的注意点：**
+
+1. 盐值不可重复。使用相同的盐值并没有比不加盐的方式更安全。
+2. 盐值长度不可过短。
+3. 生成盐值的方式应该要用不可预测，真正随机的随机算法。
+
+**HMAC**
+
+一般来说，对彩虹表的攻击对碰撞概率高的算法越有效。碰撞概率越高，那么得到相同的 hash 值所需要预设的字符串就越少。
+
+HMAC 可以和现有的 hash 算法如（md5，sha1, sha256）一起组合使用，形成 HMACMD5，HMACSHA1 等组合散列函数。
+[HMAC](https://en.wikipedia.org/wiki/HMAC#Design_principles/#Security)可以比原先的 hash 算法拥有更少的碰撞概率。如 hmacmd5 和 md5, 前者的碰撞概率要远小于后者。
+
+[read also](https://www.liaoxuefeng.com/wiki/1252599548343744/1305366354722849)
+
+**暴力攻击：**
+
+加盐的方式虽然可以防止拖库后黑客通过彩虹表等方式快速获取大量用户的原始密码。
+但是黑客却可以针对某一个特定的密码 hash 和 存储的盐值进行暴力破解。具体做法就是使用不同的字符串加上盐值进行无穷次 hash 求值，
+直到得到相同的 hash，则破解成功。
+
+在现代的计算机中，对于 6个字符的大小写数字密码，进行所有组合的 MD5 hash 求值，只需要大约 40秒。
+如果使用更好的 cpu 或者是专门的数字芯片，这个过程还会更快。
+
+**慢哈希函数：**
+
+让暴力攻击的成本变高的一种方式是使用慢哈希函数，如 [bcrypt](https://github.com/kelektiv/node.bcrypt.js)。
+
+bcrypt 会让整个 hash 过程变慢，变慢的速率是可以调节的。
+在工作因子为 12 的情况下，进行一次 'aaaa' 的 md5 hash 求值小于 1ms ，而进行一次 bcrypt hash 求值的耗时为 0.3s，相差了5个数量级。
+也就是说对于 6 个字符的大小写数字密码暴力破解大概需要 12 年。
+
+> How much slower is bcrypt than, say, MD5? Depends on the work factor. Using a work factor of 12, bcrypt hashes the password `yaaa` in about 0.3 seconds on my laptop. MD5, on the other hand, takes less than a microsecond.
+>
+> So we’re talking about **5 or so orders of magnitude**. Instead of cracking a password every 40 seconds, I’d be cracking them every **12 years** or so.
+
+[How To Safely Store A Password](https://codahale.com/how-to-safely-store-a-password/)
+
+```javascript
+const bcrypt = require('bcrypt')
+const saltRounds = 10
+const myPlaintextPassword = 's0//P4$$w0rD'
+bcrypt.genSalt(saltRounds, function (err, salt) {
+  bcrypt.hash(myPlaintextPassword, salt, function (err, hash) {
+    // Store hash in your password DB.
+  })
+})
+
+bcrypt.compare(someOtherPlaintextPassword, hash, function (err, result) {
+  // result == false
+})
+```
+
+bcrypt 生成的 hash 里面包含了盐值，因此只需要一个数据库字段来存储。
+
+```plain
+$2b$10$nOUIs5kJ7naTuTFkBy1veuK0kSxUFXfuaOKdOKf9xYT0KKIGSJwFa
+ |  |  |                     |
+ |  |  |                     hash-value = K0kSxUFXfuaOKdOKf9xYT0KKIGSJwFa
+ |  |  |
+ |  |  salt = nOUIs5kJ7naTuTFkBy1veu
+ |  |
+ |  cost-factor => 10 = 2^10 rounds
+ |
+ hash-algorithm identifier => 2b = BCrypt
+```
+
+**时序攻击：**
+
+> 时序攻击属于侧信道攻击/旁路攻击(Side Channel Attack)，侧信道攻击是指利用信道外的信息，比如加解密的速度/加解密时芯片引脚的电压/密文传输的流量和途径等进行攻击的方式，一个词形容就是“旁敲侧击”。
+
+> 举一个最简单的计时攻击的例子，某个函数负责比较用户输入的密码和存放在系统内密码是否相同，如果该函数是从第一位开始比较，发现不同就立即返回，那么通过计算返回的速度就知道了大概是哪一位开始不同的，这样就实现了电影中经常出现的按位破解密码的场景。
+> 密码破解复杂度成千上万倍甚至百万千万倍的下降。
+
+> 作者：shotgun
+
+> 链接：[https://www.zhihu.com/question/20156213/answer/43377769](https://www.zhihu.com/question/20156213/answer/43377769)
+
+> 来源：知乎
+
+> 著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+而 bcrypt 的比较函数不是时序安全的，这一点文档有体现。

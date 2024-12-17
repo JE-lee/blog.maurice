@@ -1,0 +1,150 @@
+---
+title: Reflow And Repaint
+date: '2020-02-12'
+tags: ['web']
+draft: false
+authors: []
+---
+
+网页的瓶颈一般出现在两个方面： Loading performance和 rending preformance。
+而rending performance 的瓶颈很大一部分是由于多次强制reflow和repaint造成的CPU占用过高，导致丢帧严重，表现为网页抖动，动画交互卡顿。
+
+## 像素管道
+
+在说明回流和重绘之前，我们需要了解浏览器的像素管道(pixel pipeline)
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="pixel pipe"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597588808903-be535b7b-1178-48b7-b91a-72c8a2f1bd06.png"
+    fill={true}
+  />
+</div>
+
+- javascript: 使用javascript来实现某些效果，例如插入移除DOM，修改元素的样式来实现动画等等
+- style: 此过程是根据匹配选择器来确定哪些元素应用哪些CSS规则的过程
+- layout: 在知道所有的元素应该应用哪些规则之后，浏览器开始计算所有元素的大小已经它们在浏览器中的位置。
+- paint: 填充像素。它涉及绘制出文本，颜色，图像，边框等。绘制一般在多个层上完成。
+- composite: 混合。由于页面的各部分可能被绘制到多层，由此**它们需要按正确顺序绘制到屏幕上，以便正确渲染页面**。对于与另一元素重叠的元素来说，这点特别重要，因为一个错误可能使一个元素错误地出现在另一个元素的上层
+
+**而我们所说的回流和重绘就发生在上面的管道步骤中的一步或者多步**
+
+## 回流
+
+回流阶段主要是用来确定元素的位置和大小。在这里我们需要明确的一点是，页面中的元素是存在关联的，也就是说哪怕你仅仅只修改了一个元素的layout属性，浏览器为了确定它修改后的状态，会重新执行一次上述的layout阶段。也就是重新计算所有元素的位置和大小。
+
+**当页面结果越复杂，元素阶段越多的时候，浏览器在这个阶段花费的时间就越多。**
+
+引起回流的原因不单单是**设置元素的layout属性**
+
+```javascript
+document.querySelector('#app').style.width = '400px'
+```
+
+还包括**查询元素的layout属性**。因为浏览器为了确定你查询的元素的位置和大小，需要重新计算页面中所有元素的layout信息。
+
+```javasript
+var width = document.querySelector('#app').offsetWidth
+```
+
+## 重绘
+
+重绘阶段是根据元素的大小和位置以及在其中应用的CSS样式规则来确定屏幕上像素的位置和颜色。
+
+**回流一定会导致重绘，但是重绘不一定有回流。**
+
+这句话很好理解，当我们设置元素的layout属性，需要显示的像素点的信息就完全不同了，所以需要重绘。
+
+**但是这里我有一个疑问，如果我只是单纯地因为查询layout属性而引起的回流，这时候会重绘吗？浏览器对此是否有优化?因为很明显此时元素layout信息并没有改变，根本就不需要重绘。**
+
+而引起重绘的原因除了元素的layout属性改变外，还有可能是因为其他非layout属性
+
+```javascript
+document.querySelector('#app').style.backgroundColor = red
+```
+
+如上，浏览器会跳过layout阶段，直接进入paint阶段。
+对于浏览器来说，reflow的花销是比repain要大的。
+
+## 相关
+
+如果你想知道具体CSS规则发生在layout还是paint阶段。你可以[戳此了解](https://csstriggers.com/)
+
+如果你想知道哪些layout属性会导致回流，[戳此了解](https://gist.github.com/paulirish/5d52fb081b3570c81e3a)
+
+## 减少回流和重绘的措施
+
+### 缩小样式计算的范围并降低其复杂性
+
+1. 降低元素选择器的复杂性
+2. 减少需要应用样式的元素数量
+
+### 避免强制同步布局
+
+因为不论是查询还是设置元素的layout属性都会触发回流，所以应该减少短时间内的操作次数
+
+```javascript
+function resizeAllParagraphsToMatchBlockWidth() {
+  // Puts the browser into a read-write-read-write cycle.
+  for (var i = 0; i < paragraphs.length; i++) {
+    paragraphs[i].style.width = box.offsetWidth + 'px'
+  }
+}
+```
+
+如果需要在短时间内设置多个元素属性或者设置元素的多个属性，那么应该考虑使用类似documentFragment的技术进行批量写入，或者使用这个安全高效的[fastdom](https://github.com/wilsonpage/fastdom)
+
+### 坚持使用合成层属性来完成动画
+
+由于合成层是用GPU在另外的绘制层绘制好，然后和页面一起显示的，所以它并不在layout和paint阶段，只发生在composite阶段。
+
+此方面有两个关键因素影响页面的性能：需要管理的合成器层数量，以及您用于动画的属性。
+
+目前的合成层属性只有transform和opacity。如果我们需要流畅的动效，使用transform和opacity来完成是最佳的选择。
+
+**做法是将需要应用动画的元素提升到自己的层**
+
+```css
+.moving-element {
+  will-change: transform;
+}
+
+// 对于不支持will-change的浏览器
+.moving-element {
+  transform: translateZ(0);
+}
+```
+
+**需要注意的是，不应该过度使用提升层，因为这会导致层的数量增多，对内存和GPU与CPU之间的带宽是一种负担，对性能的影响可能会超过它带来的好处。**
+
+使用 will-change: transform 提升层，当运用 transform 动画的时候
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="pixel pipe"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1604932910448-e1b7a6ee-407a-498c-a6da-f78940fd9a38.png"
+    fill={true}
+  />
+</div>
+
+而使用 transform: translateZ(0) 来提升的层，会多异步 Paint
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="pixel pipe"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1604932867624-4c3d2873-4ecc-4e0b-852e-20a60f3baf6a.png"
+    fill={true}
+  />
+</div>
+
+## 文章
+
+谷歌有个[系列的文章](https://developers.google.com/web/fundamentals/performance/rendering/)专门讲如何使用chrome的devTool来提升页面性能和渲染性能
+
+[了解回流和重绘](https://segmentfault.com/a/1190000017329980)

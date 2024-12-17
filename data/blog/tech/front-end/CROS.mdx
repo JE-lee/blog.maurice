@@ -1,0 +1,110 @@
+---
+title: CORS
+date: '2019-07-14'
+tags: ['web']
+draft: false
+authors: []
+---
+
+通过xhr 实现ajax通信的一个主要限制是浏览器跨域安全策略，即xhr会拒绝发送跨域请求。
+
+> 但在某些情况下访问跨域资源又是必须的。
+>
+> CORS(cross-origin resource share ) 是W3C的一个工作草案，它规定了浏览器和服务器应该如何沟通。
+
+CORS 背后基本的思想就是使用自定义的HTTP头，让服务器自己根据这些头部信息来决定该请求是否有效。
+
+## 各大浏览器对CROS的实现
+
+IE8,9加入了XDR(XDomainRequest类型)类型。这个类型部分实现了CORS规范。通过XDR发起的跨域请求有如下限制：
+
+- 只能是GET/POST 请求
+- 只能设置content-type
+- 不发送cookie，也不接收cookie
+- 不能访问响应头的任何信息。
+
+IE10+，FF3.5+, safari 4+ ,chrome都通过XMLHttpRequest 对象实现了CORS的原生支持。
+
+##[ Preflighted Requests](https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Access_control_CORS)
+
+各浏览器(> IE 10) 都实现了一种preflighted 的透明服务器验证机制。当浏览器发起一个跨域非简单请求的时候，将会在此之前发送一个preflighted 请求来让服务器确认是否接收这个真正的请求。浏览器在options请求成功之后才会发起真正的请求。
+
+### 简单请求
+
+- 使用GET/POST/HEAD
+- 没有修改除CORS安全头部集合之外的字段
+- content-type 只能是以下三者之一： text/plain,multipart/form-data,application/x-www-form-urlencoded
+
+## withCredentials
+
+[XMLHttpRequest.withCredentials](https://developer.mozilla.org/zh-CN/docs/Web/API/XMLHttpRequest/withCredentials)这个属性值指示了是否该使用类似cookies,authorization headers(头部授权)或者TLS客户端证书这一类资格证书来创建一个 **跨站点** 访问控制（cross-site Access-Control）请求。
+
+**这里需要指出的是，cross-origin 和 cross-site 的区别。cross-origin 不一定是 cross-site，而 cross-site 一定是 cross-origin。事实上浏览器是根据这个维护的 **[**public suffix list**](https://publicsuffix.org/list/public_suffix_list.dat)** 来决定是否是跨站请求。例如 w.google.com 和 a.google.com， 他们的公共域名前缀是 .com，而 public path + 1 都是 google.com，所以他们属于同一个站点。**
+
+在跨域请求的情况下，如果不设置 withCredentials 为true, 服务器将不能在该请求域下设置cookie,那么诸如cookie验证，保持登录之类的技术将不能使用。设置了 withCredentials 为 true 后，请求头将会携带上 `Access-Control-Allow-Credentials` 。
+
+在设置withCredientials = true的情况下，服务器响应头的Access-Control-Allow-Origin字段值[不能是通配符 \* 。](https://github.com/aspnet/SignalR/issues/2110)
+
+如果服务器对于某个资源响应头的Access-Control-Allow-Origin 为 \*, 那么请求该资源的时候应该设置
+
+```javascript
+{
+  withCredentials: false
+}
+```
+
+此时跨站请求不会携带上第三方 cookie 。
+
+## cookies 设置
+
+即使你设置了widthCredentials 为true,也有可能会发生无法写入跨域cookie的情况。原因是浏览器设置可以让你禁用掉第三方cookie。当浏览器禁用掉第三方cookie之后，那么采用cookie验证登录的技术也将不能使用，当然这个前提是你跨域请求登录。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="pixel pipe"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597588685398-ac67cea0-4e66-479a-8018-ae3b4e373a73.png"
+    fill={true}
+  />
+</div>
+
+## 传统的跨域解决方案
+
+在XMLHttpRequest level 2 出来之前，原生跨域请求根本就不可能实现，更多的是利用浏览器某些标签如link，img，script，iframe标签不受同源策略限制的特性。
+
+```javascript
+var img = new Image()
+img.src = 'http://www.xxxx.com/query?name=xxxx'
+```
+
+如上，我们已经发起了一个跨域的get请求，尽管通过img，iframe标签返回的东西我们并不能在代码中直接使用，但是我们可以通过这种方式向服务器传输少量的信息（将信息拼接在url中）。
+
+而我们通常的[jsonp解决方案](https://github.com/webmodules/jsonp)则利用的是script标签。当我们在文档中插入一个script标签的时候
+
+```javascript
+var script = document.createElement('script')
+script.src = './jsonp.js'
+document.body.appendChild(script)
+```
+
+浏览器就会下载这个文件并且执行文件里面的内容。如果我们在全局中有一个getInfo()方法，这时我们在jsonp.js中就可以调用这个方法并且传递一些参数，这个参数里面的内容可以是服务器根据query参数查询到的数据库中的内容。
+
+```javacript
+// jsonp.js
+getInfo({ name: xxx })
+```
+
+如上我们已经通过script标签跨域请求到了某某的名字。
+
+这样子的方法是存在很多局限的
+
+- 只支持get请求
+- 不支持设置头部信息
+- 不支持设置content-type
+
+还好现在99.999%的浏览器都已经支持XMLHttpRequest level 2 了，可以原生发起一个跨域请求，这才是跨域的终极解决方案。
+
+## 参考
+
+[HTTP访问控制](https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Access_control_CORS)

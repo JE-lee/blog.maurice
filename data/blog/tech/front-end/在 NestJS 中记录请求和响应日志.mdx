@@ -1,0 +1,270 @@
+---
+title: 在 Nest.js 中记录请求和响应日志
+date: '2023-11-23'
+tags: ['web']
+draft: false
+authors: []
+---
+
+从下面的 NestJS 的各个切面执行顺序可知，对于请求的 log 可以在 `Middleware`中记录，而对于响应的 log 则可以在 `Interceptor`和 `Exception Filter`中记录。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2023/png/438262/1698330855428-72aa3e51-d2a7-46eb-a603-c6052341283c.png?x-oss-process=image%2Fformat%2Cwebp"
+    fill={true}
+  />
+</div>{' '}
+
+在 NestJS 中，`Middleware` 有两种形式：
+
+一种是普通的中间件函数，和 `Express.js`中的一样。
+
+```typescript
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    next();
+  };)
+}
+
+```
+
+另一种是可注入的 `NestMiddleware` Class。
+
+```typescript
+// 定义中间件类
+@Injectable()
+export class LoggingMiddleware implements NestMiddleware {
+  @Inject(WINSTON_MODULE_PROVIDER)
+  private logger: Logger
+
+  use(req: Request, res: Response, next: NextFunction) {
+    next()
+  }
+}
+
+// 然后在 AppMoudle 中消费
+@Module()
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(LoggingMiddleware).forRoutes('*')
+  }
+}
+```
+
+这两种方式的区别有：
+
+1. 在普通函数形式的中间件中访问 `req.body` 得到的是 undefind，因为此时 NestJS 还未处理 request。
+2. 在类形式的中间件函数中，访问 `req.body` 是可以拿到请求数据的。但是 NestJS 默认只会处理 `applicaiton/json`的数据，对于 `form-data`形式的请求数据是需要**手动处理**的。
+
+请求日志的实现，记录 url, query, body 等信息。
+
+```typescript
+import { Request } from 'express'
+import busboy from 'busboy'
+import { withResolvers } from './with-resolvers'
+
+export type FormdataBody = Record<string, string | string[]>
+// This function is used to parse form data from a request
+export function parseFormdata(request: Request): Promise<FormdataBody> {
+  const bb = busboy({ headers: request.headers })
+  const { promise, resolve, reject } = withResolvers<FormdataBody>()
+
+  const body: FormdataBody = {}
+
+  bb.on('field', (fieldname, val) => {
+    const existing = body[fieldname]
+    if (existing) {
+      if (Array.isArray(existing)) {
+        existing.push(val)
+      } else {
+        body[fieldname] = [existing, val]
+      }
+    } else {
+      body[fieldname] = val
+    }
+  })
+
+  bb.on('finish', () => {
+    resolve(body)
+  })
+
+  bb.on('error', (err) => {
+    reject(err)
+  })
+
+  request.pipe(bb)
+  return promise
+}
+
+// convert promise style function to callback style
+export function callbackfy<T extends (...args: any[]) => Promise<any>>(promiseFn: T) {
+  return (...args: [...Parameters<T>, Callback<ReturnType<T>>?]) => {
+    const cb = args.pop() as Callback<ReturnType<T>>
+    promiseFn(...args)
+      .then((data) => cb(null, data))
+      .catch((err) => cb(err))
+  }
+}
+
+const parseBody = callbackfy(parseFormdata)
+
+/**
+ * 请求入参记录中间件，记录 json格 式和 formdata 格式的请求参数
+ */
+@Injectable()
+export class LoggingMiddleware implements NestMiddleware {
+  constructor(private readonly logger: LogService) {}
+
+  use(req: Request, res: Response, next: NextFunction) {
+    const contentType = req.headers['content-type']
+    const isJson = typeof contentType === 'undefined' || contentType === 'application/json'
+    const isFormdata = contentType?.includes('multipart/form-data')
+    const log = (body: any) => {
+      this.logger.info(`${req.method} ${req.baseUrl + req.path}`, {
+        label: 'Request',
+        info: {
+          body,
+          query: req.query,
+        },
+      })
+    }
+
+    if (isJson) {
+      log(req.body)
+    } else if (isFormdata) {
+      /**
+       * We can't pipe the request in the middleware and the interceptor at the same time.
+       * The middleware and interceptor are not executed in a same synchronous context.
+       * So we can only parse it in the 'finish' event.
+       */
+      res.on('finish', () => {
+        // has extracted the form data by the FileInterceptor or FilesInterceptor
+        if (req.readableDidRead) {
+          log(req.body)
+        } else {
+          // maybe not passed the guards, so we need to parse the form data
+          parseBody(req, (err, body) => {
+            if (!err) {
+              log(body)
+            }
+          })
+        }
+      })
+    }
+
+    next()
+  }
+}
+```
+
+需要注意的是：
+
+我们不能够同时在 Middleware 和 Interceptor 中将 request pipe 进两个不同的 WritableStream。最大的原因是他们不在同一个 synchronous context.
+
+```javascript
+// ✅
+r1.pipe(w1)
+r1.pipe(w2)
+
+// ❎
+r1.pipe(w1)
+Promise.resolve().then(() => {
+  r1.pipe(w2)
+})
+
+// ❎
+r1.pipe(w1)
+setTimeout(() => {
+  r1.pipe(w2)
+})
+```
+
+所以在 LoggingMiddleware 中，不再使用 busboy 直接解析 formdata，而是将其推迟到 res.on('finish') 中。
+
+对于响应的日志记录分为两种情况，一种是记录正常的响应数据，一种是记录错误响应。
+
+正常的请求响应记录可以在 interceptor 中实现。
+
+```typescript
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common'
+import { Observable, map } from 'rxjs'
+import type { Request } from 'express'
+
+@Injectable()
+export class GlobalResponseInterceptor implements NestInterceptor {
+  @Inject(WINSTON_MODULE_PROVIDER)
+  private logger: Logger
+
+  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+    return next.handle().pipe(
+      map((data) => {
+        const req = context.switchToHttp().getRequest<Request>()
+        this.logger.info(`${req.method} ${req.baseUrl + req.path}`, data)
+      })
+    )
+  }
+}
+```
+
+而对于响应是 `Error` 的情况，我们在 `ExceptionFilter` 中记录。
+
+```typescript
+import { isWithMessage } from '@/shared'
+import {
+  ArgumentsHost,
+  Catch,
+  ExceptionFilter,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Scope,
+} from '@nestjs/common'
+import { HttpAdapterHost } from '@nestjs/core'
+import type { Logger } from 'winston'
+
+@Injectable({ scope: Scope.TRANSIENT })
+@Catch()
+export class GlobalExceptionFilter<T> implements ExceptionFilter {
+  constructor(
+    private readonly httpAdapterhost: HttpAdapterHost,
+    private readonly logger: Logger
+  ) {}
+
+  catch(exception: T, host: ArgumentsHost) {
+    const { httpAdapter } = this.httpAdapterhost
+    const ctx = host.switchToHttp()
+
+    const httpStatus =
+      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR
+
+    const error = exception instanceof HttpException ? exception.getResponse() : exception
+    const message = isWithMessage(error)
+      ? error.message.toString()
+      : error || 'Internal Server Error'
+
+    const request = ctx.getRequest()
+    const path = httpAdapter.getRequestUrl(request)
+    const method = httpAdapter.getRequestMethod(request)
+    const code = httpStatus
+    const responseBody = {
+      code,
+      timestamp: new Date().toISOString(),
+      path,
+      message,
+    }
+
+    this.logger.error(
+      `${method} ${path} [${code}] - ${message}
+      ${(exception as any).stack}
+    `,
+      { traceId: request.headers['x-trace-id'] }
+    )
+
+    httpAdapter.reply(ctx.getResponse(), responseBody, httpStatus)
+  }
+}
+```

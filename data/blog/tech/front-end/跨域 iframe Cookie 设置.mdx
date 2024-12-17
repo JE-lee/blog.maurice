@@ -1,0 +1,47 @@
+---
+title: 跨域 iframe Cookie 设置
+date: '2022-09-15'
+tags: ['web']
+draft: false
+authors: []
+---
+
+我需要在当前项目站点 `http://oms.company.com` 中嵌入报表系统的网页 `https://data.company2.com`。
+
+这两个站点虽然源不同，但是使用的是集团统一的登录方式，所以可以通过共享 token 在这两个系统中完成身份验证和鉴权。
+
+以下 `http://oms.company.com`为 `A`，`https://data.company2.com`为 `B`。
+
+共享 token 的方式如下：
+
+1. 在 `A`中 嵌入 `B`
+2. 在 `B`的 url query 中传入 token
+3. `B`网页解析 query，并将 token 写入 `B`的 cookie。
+
+在 FireFox 中工作正常，在 Chrome 中的问题是，B 无法写入 Cookie。
+
+原因：
+
+Chrome 80+ 之后，Cookie 的 SameSite 默认为 Lax，而 `A`和`B`之间跨域并且协议不同，所以无法写入。(仅推测，但是事实表现确实如此)
+
+解决方法是，`B`在写入的时候指定 SameSite=None;secure=true
+
+```javascript
+document.cookie = 'token=xxxx;domain=.company2.com;SameSite=None;secure=true'
+```
+
+这个解决方法是不完美的。SameSite=Lax 本来是为了防止 CSRF 攻击出现的，但是我们现在为了让业务正常运行，又抛弃了这个。
+
+比较好的解决方案是借助新的 Cookie Same Party 特性。
+
+将 `A`和 `B`定义为 First Party Set， 让他们在同一实体下面，并且在设置 cookie 的时候指明 SameParty 属性。
+
+[详解 Cookie 新增的 SameParty 属性](https://juejin.cn/post/7002011181221167118#heading-4)
+
+[关于 cookie 的好文](https://juejin.cn/post/7087206796351242248)
+
+[CROS](https://www.yuque.com/u269426/oz4uyz/er09ww)
+
+[前端安全](https://www.yuque.com/u269426/zgxgo0/vi48t3)
+
+[mdn 同源策略](https://developer.mozilla.org/zh-CN/docs/Web/Security/Same-origin_policy)

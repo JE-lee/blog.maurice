@@ -1,0 +1,88 @@
+---
+title: 生成随机 ID 字符串
+date: '2020-08-14'
+tags: ['web']
+draft: false
+authors: []
+---
+
+## node-hat
+
+最近在查看某个流程引擎框架的源码的时候，发现其生成id字符串的库用的是 substack 大神的[node-hat](https://github.com/substack/node-hat)。
+这个库内部使用 Math.random 来生成随机数，然后转换成16进制字符串。
+
+node-hat 有两种用法。
+
+```javascript
+const hat = require('hat')
+hat()
+
+const rack = hat.rack()
+rack()
+```
+
+rack 方式会在内部判断生成的 id 是否存在，所以在生成的 id 的数量小于指定的 bit(2^bit) 之前，都不会冲突。
+而hat 方式由于没有这个判断，所以冲突的概率比 rack 要大得多。
+
+默认随机数的范围是 128 位，也就是 2^128 个数字。node-hat.js 允许指定位数，但是这样子会加大冲突的概率。
+
+```javascript
+const hat = require('hat')
+const chalk = require('chalk')
+console.log(chalk.red('测试随机数是否重复'))
+function test(times, geneFn) {
+  let ids = new Set()
+  let start = Date.now()
+  for (let i = 0; i < times; i++) {
+    ids.add(geneFn(12))
+  }
+  console.log(chalk.green(`生成${times}个数据花费${Date.now() - start}ms`))
+  console.log(`repetition rate ${ids.size} / ${times} = ${((times - ids.size) / times).toFixed(6)}`)
+}
+test(10000 * 10, hat)
+```
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597419065571-5d8fdbf3-8459-4a71-bff7-ff1aa9207edd.png"
+    fill={true}
+  />
+</div>
+
+如上，如果指定的位数太小，冲突的概率将会非常大。这就决定不能用于 session token 或者 API key。
+
+同时，因为其内部使用了 Math.random，所以这个算法严格意义上来说是不安全的。Math.random 生成的是伪随机数。
+伪随机数使用**确定性**的算法生成的一系列[0,1]之间的随机数序列。黑客可以通过一组随机数序列推测出seed(Math.random 使用当前时间作为seed )，
+从而预测序列中的其他数字。
+
+要想得到安全的随机数，我们需要 uuid 或者是 crypto library。
+
+## UUID
+
+```javascript
+const uuidV1 = require('uuid/v4')
+uuidV1() // ⇨ '2c5ea4c0-4067-11e9-8bad-9b1deb4d3b7d'
+```
+
+生成固定格式的安全唯一字符串
+
+## nanoid
+
+[nanoid](https://github.com/ai/nanoid)  uses the crypto module in Node.js and the Web Crypto API in browsers. These modules use unpredictable hardware random generator.
+
+```javascript
+const nanoid = require('nanoid')
+model.id = nanoid() //=> "Uakgb_J5m9g-0JDMbcJqLJ"
+// 可以指定更小的位数，但是会增加冲突的概率
+nanoid(10) //=> "IRFa-VaY2b"
+```
+
+## 随机数算法的一些思考
+
+我认为衡量一个随机数算法的好坏有两个很重要的指标
+
+- 均匀性，每个随机数的生成概率应该是一样的
+- 不可预测性，生成的必须是真正的随机数。

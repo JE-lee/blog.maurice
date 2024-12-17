@@ -1,0 +1,34 @@
+---
+title: 多环境下的 cookie 污染
+date: '2018-06-24'
+tags: ['web']
+draft: false
+authors: []
+---
+
+设置 cookie 的时候可以指定 `domain` 域名作用范围， `path` 文档作用范围， `expires` 过期时间等。
+
+```javascript
+document.cookie =
+  'token=x4df3fn3; domain=.dev.example.com; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/'
+```
+
+然而cookie 的特性使得我们在读取 cookie 的时候无法得知其对应的 `domain` `path` 等信息。
+
+```javascript
+document.cookie // "token=x4df3fn3"
+```
+
+并且对于同名的 cookie，如果设置的 `domain` 或者 `path` 不一样，那么这两个 cookie 是可以共存的。
+
+```javascript
+document.cookie =
+  'token=x4df3fn3; domain=.example.com; expires=Fri, 31 Dec 9999 23:59:59 GMT; path=/'
+document.cookie // "token=x4df3fn3; token=x5df2ff"
+```
+
+如果不谨慎对待 cookie 的这两个特性，那么在多环境网站中可能会遇到意想不到的问题。
+
+试想，某公司有 www.vaike.com，news.vaike.com，store.vaike.com，vai.com 四个不同环境的网站，如果将某个 cookie 的信息都设定在 vaike.com 这个 domain 下面，而这个信息又是各环境独立的，那么此时这个 cookie 信息就会被其他环境污染。具体的表现为： 在 www.vaike.com 中访问到的这个 cookie 信息其实是在 news.vaike.com 下设置的。
+
+解决的方法的也很简单，对于不在各个环境共享的 cookie 信息，应该指定 domain 为完整的网站 host，而需要的共享的 cookie 信息，则指定为共同的父域名。

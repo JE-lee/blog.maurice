@@ -1,0 +1,133 @@
+---
+title: 访问 Nginx 资源 403 问题
+date: '2021-11-01'
+tags: ['web']
+draft: false
+authors: []
+---
+
+> linux version: CentOS Linux release 7.9.2009 (Core)
+>
+> Nginx version: nginx/1.20.1
+
+部分 Nginx 配置文件：
+
+```nginx
+server {
+  listen       9000;
+  listen       [::]:9000;
+  server_name  localhost;
+
+  root /work/app/sale-world-manage;
+  index index.html index.htm;
+
+}
+```
+
+启动 Nginx
+
+```bash
+systemctl start nginx
+```
+
+访问 index.html， `403` 报错。
+
+查看 error.log 日志：
+
+**"/work/app/sale-world-manage/index.html" is forbidden (13: Permission denied)**
+
+1. 检查根目录下是否有 index.html index.htm。
+2. 查看 Nginx 的启动用户和 root 文件夹的所属用户是否一致
+
+```bash
+[root@tchattest nginx]# ps -aux | grep nginx
+root      16227  0.0  0.0  43640  1112 ?        Ss   15:03   0:00 nginx: master process /usr/sbin/nginx
+root      16228  0.0  0.0  46288  4148 ?        S    15:03   0:00 nginx: worker process
+root      16229  0.0  0.0  46288  4152 ?        S    15:03   0:00 nginx: worker process
+
+[root@tchattest nginx]# ls -l /work/app/sale-world-manage/
+总用量 412
+-rwxrwxrwx. 1 root root  80189 10月 29 14:24 avatar2.jpg
+-rwxrwxrwx. 1 root root 238831 10月 29 14:24 color.less
+drwxrwxrwx. 2 root root   4096 10月 29 14:20 css
+drwxrwxrwx. 2 root root   4096 10月 29 14:20 img
+-rwxrwxrwx. 1 root root  18956 10月 29 14:24 index.html
+drwxrwxrwx. 2 root root   8192 10月 29 14:20 js
+drwxrwxrwx. 3 root root     60 10月 29 14:20 loading
+-rwxrwxrwx. 1 root root  50632 10月 29 14:24 logo.png
+drwxrwxrwx. 7 root root    220 10月 29 14:20 UE
+
+```
+
+可以看到 Nginx 的工作用户和 root 文件夹的所属用户一致，都是 root ，并且设定了 root 文件夹可读可写。
+
+如果工作用户不一致，需要在 Nginx 配置文件中修改 Nginx 的工作用户。
+
+```nginx
+# nginx.conf
+user root;
+```
+
+3. 检查 SELinux 状态
+
+SEliux 在开启的情况下，如果进程上下文和文件上下文不一致，Nginx 将没有权限读取文件。
+
+查看当前系统 SELinux 配置：
+
+```bash
+[root@tchattest nginx]# cat /etc/selinux/config
+
+# This file controls the state of SELinux on the system.
+# SELINUX= can take one of these three values:
+#     enforcing - SELinux security policy is enforced.
+#     permissive - SELinux prints warnings instead of enforcing.
+#     disabled - No SELinux policy is loaded.
+SELINUX=enforcing
+# SELINUXTYPE= can take one of three values:
+#     targeted - Targeted processes are protected,
+#     minimum - Modification of targeted policy. Only selected processes are protected.
+#     mls - Multi Level Security protection.
+SELINUXTYPE=targeted
+
+```
+
+当前 SELinux 的 类型为 targeted，在此种模式下，只需要关注进程上下文和文件上下文的类型一致即可。
+
+查看 Nginx 进程上下文 和 根目录的文件上下文：
+
+```bash
+[root@tchattest nginx]# ps -auxZ | grep nginx
+system_u:system_r:httpd_t:s0    root      16227  0.0  0.0  43640  1112 ?        Ss   15:03   0:00 nginx: master process /usr/sbin/nginx
+system_u:system_r:httpd_t:s0    root      16228  0.0  0.0  46288  4148 ?        S    15:03   0:00 nginx: worker process
+system_u:system_r:httpd_t:s0    root      16229  0.0  0.0  46288  4152 ?        S    15:03   0:00 nginx: worker process
+
+[root@tchattest nginx]# ls -Z /work/app/sale-world-manage/
+-rwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 avatar2.jpg
+-rwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 color.less
+drwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 css
+drwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 img
+-rwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 index.html
+drwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 js
+drwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 loading
+-rwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 logo.png
+drwxrwxrwx. root root unconfined_u:object_r:root_sys_t:s0 UE
+
+```
+
+可以看到，进程上下文的 TYPE 是 `httpd_t`，而根目录的文件上下文 TYPE 是 `root_sys_t`, 两者不一致。
+
+修改根目录文件上下文的 TYPE
+
+```bash
+setenforce 0 # 暂时关闭 SELinux
+chcon -t httpd_t /work/app/sale-world-manage
+setenforce 1
+```
+
+重启 Nginx， 访问成功。
+
+有关 SELinux:
+
+[SELinux 入门](https://zhuanlan.zhihu.com/p/30483108)
+
+[SELinux 《鸟哥的linux私房菜》](https://wizardforcel.gitbooks.io/vbird-linux-basic-4e/content/143.html)

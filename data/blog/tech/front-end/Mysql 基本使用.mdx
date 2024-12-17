@@ -1,0 +1,564 @@
+---
+title: MySql 基础
+date: '2022-02-11'
+tags: ['web']
+draft: false
+authors: []
+---
+
+## 语句的分类
+
+- **DQL（\*\***数据查询语言\***\*）**: 查询语句，凡是 select 语句都是 DQL。
+- **DML（数据操作语言）**: insert delete update 对表中的数据进行增删改。
+- **DDL（数据定义语言）**: create drop alter 对表结构的增删改。
+- **TCL（事务控制语言）**：commit 提交事务，rollback 回滚事务。
+- **DCL（数据控制语言）**：grant 授权，revoke 撤销权限等。
+
+## MySQL 常用命令
+
+命令不同于 SQL 语句，他是数据库管理系统特有的。不同的数据库管理系统如 MySQL 和 oracle 的命令语句都是不一样的，但是他们都支持标准的 SQL 语句。
+
+```bash
+# 查看数据库
+show databases;
+# 创建数据库
+create database dbname;
+# 判断数据库是否存在再创建
+create databse if not exists dbname;
+# 选择数据库
+use dbname;
+# 删除数据库
+drop database dbname;
+
+# 查询当前使用的数据库
+select database();
+# 查询当前数据库版本
+select version();
+# 终止当前正在编写的语句，使用 \c
+# 退出 mysql
+# \q 或者是 exit;
+
+# 查看当前数据中的表
+show tables;
+# 查看指定数据库中的表
+show tables from dbname;
+# 查看表结构
+desc tablename;
+descibe tablename;
+explain tablename;
+show columns from tablename;
+show fields from tablename;
+# 查看表创建语句
+show create table tablename;
+# 修改表
+ALTER TABLE 旧表名 RENAME TO 新表名;
+# 增加列
+ALTER TABLE 表名 ADD COLUMN 列名 数据类型 [列的属性];
+# 删除列
+ALTER TABLE 表名 DROP COLUMN 列名;
+# 修改列
+ALTER TABLE 表名 MODIFY 列名 新数据类型 [新属性];
+
+
+# 执行 sql 脚本
+source ./source.sql
+# 删除表
+drop table tablename;
+
+# 导出数据库
+mysqldump databasename>path -uroot -pxxxx
+# 指定表导出
+mysqldump databasename table>path -uroot -pxxx
+# 导入数据库
+create database xxx
+use xxx
+source path
+```
+
+## 常用语句
+
+### 查询
+
+#### 普通查询
+
+```sql
+/* 查询 */
+select field1, field2, field3 from tablename;
+/* 字段可以参与数学运算 */
+selet field1*12 from tablename;
+seect field1 * 12 as yearsal from tablename;
+select field1 * 12 as '年薪' from tablename; --标准 sql 语句要求字符串用单引号
+select field1 * 12 '年薪' from tablename; --as 可以省略
+```
+
+#### 条件查询
+
+```sql
+/*条件查询*/
+select ename from tablename where sal <> 3000;
+/* and or 连用 左结合 */
+select enam, sal form emp where sal > 3000 and ();
+select ename from emp where sal in (1000, 3000, 4000);
+
+/* 模糊查询 %代表任意多个字符， _ 代表任意一个字符 */
+select ename from emp where ename like '张_';
+select ename from emp where ename not like '张_';
+
+// 判断 NULL
+select enam from emp where ename is null;
+select ename from emp where ename is not null;
+```
+
+#### 排序
+
+```sql
+/* 排序
+按照工资降序，名称升序排列 */
+select ename, sal from emp order by sal desc, enam asc;
+select ename, sal from emp order by 1; --按照第一列排序
+```
+
+#### 分组函数
+
+分组函数也叫多行处理函数，对多行数据进行操作，最终只输出一行结果。
+
+分组函数自动忽略 NULL。
+
+分组函数不能出现在 where 字句中。
+
+分组函数一般都会和 group by 联合使用，并且在 group by 语句执行后才执行。
+
+sum, max, min, avg, count
+
+```sql
+select count(ename) from emp; --总人数
+```
+
+#### 流程控制函数
+
+case
+
+if
+
+ifnull
+
+nullif
+
+```sql
+select ename, (sal + ifnull(comm, 0))* 12 as yearsal from emp;
+select count(*), count(comm) from emp; --* 和 具体字段的区别。
+```
+
+#### 其他函数
+
+#### group by 和 having
+
+group by： 按照某个字段或者某些字段进行分组。
+
+having: 对分组之后的数据进行二次过滤。
+
+```sql
+/* 找出每个工作岗位的最高薪资 */
+select max(sal) from emp group by job;
+/* 找出工资大于平均工资的员工 */
+select ename, sal from emp where sal > (select avg(sal) form emp); --子查询
+/* 找出每个部门不同岗位的最高薪资 */
+select deptno, job, max(sal) from emp group by deptno, job;
+/* 找出每个部门最高薪资且大于2500 */
+select deptno, max(sal) from emp group by deptno having max(sal) > 2500; -- 这种方式效率低
+select deptno, max(sal) from emp where sal > 2500 group by deptno;
+```
+
+#### 去除重复记录
+
+distinct，只能出现在所有字段的最前方
+
+```sql
+select distinct job from emp;
+/* 统计岗位数量 */
+select count(distinct job) from emp;
+```
+
+#### 子查询
+
+select 语句中嵌套 select 语句，被嵌套的 select 语句就是子查询。
+
+子查询可以出现在 如下位置。
+
+```sql
+select
+ ...select
+from
+ ...select
+where
+ ...select
+
+# 找出高于平均薪资的员工
+select * from emp where (select avg(sal) from emp);
+# 找出每个部门平均薪水的工资等级
+select t.avgsal, d.dname, s.grade from (select e.deptno, avg(e.sal) as avgsal from emp e group by e.deptno) t
+join dept d on t.deptno = d.deptno
+join salgrade s on t.avgsal between s.losal and s.hisal;
+
+# 用在 select 中
+select e.ename (select d.dname from dept d where e.deptno = d.deptno) as dname from emp e;
+```
+
+**标量子查询**
+
+单纯地代表一个值
+
+```sql
+SELECT * FROM student_score WHERE number > (SELECT number FROM student_info WHERE name = '杜琦燕');
+```
+
+**列子查询**
+
+代表多个值
+
+```sql
+SELECT * FROM student_score WHERE number IN (SELECT number FROM student_info WHERE major = '计算机科学与工程');
+```
+
+**行子查询**
+
+子查询的结果集中只有一行记录，且有多个列。
+
+```sql
+SELECT * FROM student_score WHERE (number, subject) = (SELECT number, '母猪的产后护理' FROM student_info LIMIT 1);
+```
+
+**表子查询**
+
+子查询的结果集中含有多行多列
+
+```sql
+SELECT * FROM student_score WHERE (number, subject) IN (SELECT number, '母猪的产后护理' FROM student_info WHERE major = '计算机科学与工程');
+```
+
+**EXISTS 和 NOT EXISTS 子查询**
+
+```sql
+SELECT * FROM student_score WHERE EXISTS (SELECT * FROM student_info WHERE number = 20180108);
+```
+
+#### 连接查询
+
+```sql
+SELECT * FROM t1 [INNER | CROSS] JOIN t2 [ON 连接条件] [WHERE 普通过滤条件];
+```
+
+在两表连接的过程中，主表只需要查询一次，而副表需要查询多次。
+
+比如 SELECT \* FROM t1, t2 WHERE t1.m1 > 1 AND t1.m1 = t2.m2 AND t2.n2 < 'd'_;_
+
+- _首先查询出 t1 主中 ti.m1 > 1 的记录有两条_
+- _然后查询两次副表，相当于 t2.m2 = 1 AND t2.n2 < d 和 t2.m2 = 2 AND t2.n2 < d _
+
+\_\_
+
+WHERE 子句中的过滤条件就是我们平时见的那种，不论是内连接还是外连接，凡是不符合 WHERE 子句中的过滤条件的记录都不会被加入最后的结果集。
+
+外连接查询的时候，主表中的数据符合 where 条件的记录全部查出，如果从表中不存在 ON 条件中的记录，也会保留该条连接记录，并且从表的字段全部用 NULL 填充。
+
+**连接分类**：
+
+内联接
+
+**[inner] join**
+
+```sql
+select e.ename, d.dptname from emp e, dept d;
+/* 匹配次数不会减少 */
+select e.ename, d.dptname from emp e, dept d where e.deptno = d.deptno; -- SQL92 语法
+select e.ename, d.dptname from emp e [inner] join dept d on e.deptno = d.deptno; -- SQL 99 语法
+
+```
+
+外联接
+
+左外联接，左边的表是主表 **left join**
+
+右外联接，右边的表是主表 **right join**
+
+```sql
+select e.ename, b.ename from emp e left join emp b on e.mgr = b.empno; --左联接
+select e.ename, b.ename from emp b right outer join emp e on e.mgr = b.empno; --外联接
+/* 找出哪个部门没有员工 */
+select d.* from emp e right join dept d on e.deptno = d.deptno where e.empnp is null;
+```
+
+**内外连接的区别**：
+
+对于内连接的两个表，主表中的记录在副表中找不到对应的记录，该**记录不会加入结果集**。
+
+对于外连接，主表中的记录即使在副表中不存在，也会加入结果集，并且副表**自动模拟出 NULL 与之匹配**。
+
+<u>内外连接的过程都是主副表先经过 </u>**<u>where </u>**
+<u>过滤，然后进行笛卡尔乘积计算，再筛选出符合 </u>**<u>on</u>**
+<u> 条件的记录。(自己理解的，待验证)</u>
+
+#### 三表联接
+
+可以使用多个 join ... on ... 连接查询任意多个表。
+
+```sql
+# 查出每个员工的部门名称和工资等级
+select e.ename, d.dname, s.grade from emp e
+join dept d on e.deptno = d.deptno
+join salgrade s on e.sal between s.losal and s.hisal;
+# 查出每个员工的部门名称和工资等级以及上级领导
+select e.ename, d.dname, s.grade, e1.ename from emp e
+join dept d on e.deptno = d.deptno
+join salgrade s on e.sal between s.losal and s.hisal
+left join emp e1 on e.mgr = e1.empno;
+```
+
+#### union 组合查询
+
+可以将查询结果集相加， 列名以第一个结果集的列名为基准，所以后面接的 where group by 条件中的列名都要以第一个结果集的列名为基准。
+
+```sql
+select ename, job from emp where job = 'manager' or job = 'sales';
+select ename, job from emp where job in ('manager', 'sales');
+select ename, job from emp where job = 'manager'
+union
+select ename, job from emp where job = 'sales';
+```
+
+union 默认过滤两个结果集重复的部分，如果想要保留，可以使用 union all。
+
+#### 递归查询
+
+```sql
+WITH recursive tmps ( id, NAME, parent_id ) AS (
+	SELECT
+		id,
+		NAME,
+		parent_id
+	FROM
+		teams
+	WHERE
+		id = 1337845333000 UNION ALL
+	SELECT
+		t.id,
+		t.NAME,
+		t.parent_id
+	FROM
+		tmps AS tp
+		JOIN teams AS t ON tp.id = t.parent_id
+	) SELECT
+	tm.user_id,
+	users.NAME AS user_name,
+	tp.id AS team_id,
+	tp.NAME AS team_name,
+	tp.parent_id AS team_parent_id
+FROM
+	team_members AS tm
+	JOIN tmps AS tp ON tm.team_id = tp.id
+	JOIN users ON users.id = tm.user_id;
+```
+
+#### limit
+
+mysql 特有，取结果集中的部分。
+
+limit startIndex, length
+
+```sql
+# 取工资前 5 名
+select ename, sal from emp order by sal desc limit 0, 5;
+select ename, sal from emp order by sal desc limit 5;
+```
+
+#### 顺序
+
+```bash
+select        6
+	..
+from 	 				1
+	..
+join          2
+	...
+where         3
+	..
+group by      4
+	...
+having        5
+	...
+order by      7
+	...
+limit         8
+```
+
+### 创建表
+
+```sql
+create table table_name (
+  field1 char(6),
+  field2, varchar(2014),
+  ...
+);
+
+# 表的复制
+create table1 t1 as select * from t2;
+insert into table as select * from t3;
+```
+
+#### DataType
+
+column 属性：
+
+AUTO_INCREMENT, NOT NULL, UNIQUE, UNSIGNED
+
+zero_fill:
+
+```sql
+CREATE TABLE zerofill_table (
+    i1 INT UNSIGNED ZEROFILL, // 不足显示宽度的会补0，只限于 UNSIGNED INT
+    i2 INT UNSIGNED
+);
+
+
+```
+
+[速览](https://www.cnblogs.com/TomFord/p/10834188.html)
+
+blob, clob 的插入不能简单使用 insert 插入。
+
+#### 约束
+
+非空 not null
+
+唯一 unique
+
+唯一性修饰的字段具有唯一性，不能重复，但是可以为 NULL。
+
+可以给两个或者多个列添加 unique
+
+```sql
+/-- 列级约束
+create table t_user (
+	id int,
+  usercode varchar unique,
+  username varchar unique
+)
+/-- 联合添加约束
+/-- 表级约束
+create table t_user (
+	id int,
+  usercode varchar ,
+  username varchar ,
+  unique(usercode, username)
+)
+
+```
+
+主键 primary key // 既不能为null 也不能重复
+
+```sql
+create table t_user(
+	id int primary key,
+)
+```
+
+单一主键，复合主键
+
+自然主键，业务主键
+
+主键自增
+
+```sql
+create table t_user() {
+	id int primary key auto_increment, /-- 从 1 开始自增
+}
+
+
+```
+
+#### 外键 foreign key
+
+[外键约束 doc](https://dev.mysql.com/doc/refman/8.0/en/create-table-foreign-keys.html)
+
+外键约束的值和普通的字段值的区别是 外键的值必须来自主表的值。
+
+删除时先删从表，再删主表。
+
+添加数据的时候，先添加主表，再添加从表。
+
+创建表的时候，先创建主表，再创建从表。
+
+```sql
+create table t_class(
+	cno int,
+  cname varchar(255),
+  primary key(cno)
+)
+
+create table t_student(
+	sno int,
+  sname varchar(255),
+  classno int,
+  foreign key(classno) references t_class(cno)
+)
+```
+
+**被外键引用的字段必须是 unique**。
+
+**on [delete, update] cascade**: 在父表上 delete/update 记录时，同步 delete/update 子表上的记录。
+
+**on [delete, update] set null**: 在父表上 delete/update 记录时，设置子表上对应记录的键值为 NULL。
+
+**on [delete, update] restrict**: 在父表上 delete/update 记录时，如果子表中有对应的记录，则拒绝 delete 或者 update 父表。
+
+**no action** : 同 restrict。
+
+### 向表中插入数据
+
+```sql
+insert into 表名(field1, field2...) values(v1, v2...)
+insert into 表名(field1, field2...) values(v1, v2...),(V1, V2...)
+insert into 表名 values(... 注意顺序)
+```
+
+insert ignore
+
+如果插入的数据和表中已有的数据重复，则替换成新插入的数据。
+
+insert on duplicate key update
+
+如果插入的数据和表中已有的数据重复，则更新。
+
+### 修改数据
+
+```sql
+update 表名 set field=V1, field2=v2 where 条件
+```
+
+没有条件，则修改整张表的数据
+
+### 删除表中的数据
+
+```sql
+delete from 表名 where 条件;
+```
+
+### 怎么删除大表？
+
+delete 语句删除大语句效率很低
+
+truncate table tablename; // 只保留表头
+
+## MySQL DOC 参考
+
+MySQL [select statement](https://dev.mysql.com/doc/refman/8.0/en/select.html) 文档
+
+[MySQL commands](https://dev.mysql.com/doc/refman/8.0/en/mysql-commands.html)
+
+[统计函数](https://dev.mysql.com/doc/refman/8.0/en/aggregate-functions.html)
+
+[流程控制函数](https://dev.mysql.com/doc/refman/8.0/en/flow-control-functions.html)
+
+[group by](https://dev.mysql.com/doc/refman/8.0/en/group-by-modifiers.html)
+
+[data type](https://dev.mysql.com/doc/refman/8.0/en/data-types.html)

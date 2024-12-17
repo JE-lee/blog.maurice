@@ -1,0 +1,125 @@
+---
+title: MySql 事务和锁
+date: '2022-11-11'
+tags: ['web']
+draft: false
+authors: []
+---
+
+## 引擎区别
+
+```sql
+show engines \g;
+```
+
+MyISAM
+
+不支持事务
+
+使用三个文件组织一张表 xxx.frm xxx.MYD xxx.MYI
+
+灵活的AUTO_INCREAMENT 处理
+
+可压缩节省存储空间，并且可转换为只读表
+
+Innodb
+
+支持事务，行级锁。这种存储引擎数据的安全得到保障。
+
+数据库奔溃提供自动恢复。
+
+支持级联删除，级联更新。
+
+MEMORY
+
+不支持事务，数据容易丢失，所有数据和索引都存储在内存中。
+
+查询速度最快。
+
+不能存储 TEXT 和 BLOB 字段。
+
+## 事务概述
+
+事务是一个完整的业务逻辑单元，通常有多条DML语句完成。
+
+commit; rollback; savepoint;
+
+四大特性：
+
+ACID
+
+A: 原子性， 最小的工作单元，不可再分
+
+C: 一致性，保证多条DML语句同时成功或者失败
+
+I: 隔离性，事务A和事务B之间具有隔离。
+
+D: 持久性， 最终数据必须持久化到硬盘文件中。
+
+start tracsaction: 关闭 mysql 的自动提交
+
+### 隔离级别
+
+幻读： 强调在一次事务中读取到事务开始时不存在的记录(读多了)。
+
+隔离级别：
+
+1. 读未提交（read uncommitted）
+
+一个事务未提交，它的变更可以被的事务看到。
+
+2. 读已提交 （read committed）
+
+   一个事务提交后，它的变更才可以被别的事务看到。事务未结束时不可重复读。
+
+3. 可重复读 （repeatable read）
+
+解决了不可重复读问题，读取到的数据都是事务开始时候的数据，但是没有解决幻读。mysql 默认的隔离级别
+
+4. 序列化读 /串行化
+
+解决了所有问题，需要事务排队。事务锁
+
+```sql
+set [global transaction] isolation level read uncommitted;
+select @@global.tx_isolation;
+```
+
+[事务理解](https://juejin.cn/post/6844903805822173198)
+
+[关于事务](https://juejin.cn/post/6844903941923143688#heading-7)
+
+## 锁
+
+### S 锁 和 X 锁
+
+S 锁： share lock, 共享锁，也称为读锁。
+
+X 锁： exclusive lock, 排他锁，也称为写锁。
+
+一个事务对某行记录加上 S 锁后，其他事务只能获取该记录的 S 锁，而不能获取该记录 的 X 锁。
+
+只能当该记录的所有 S 锁都释放后，才能获取该记录的 X 锁。
+
+一个事务如果要修改某条记录，必须获得该记录的 X 锁。
+
+多个事务不能同时获得 X 锁，同时只能有一个事务获得 X 锁，其他事务等待。
+
+提前加 X 锁的方法：
+
+select .. for update;
+
+select .. for update nowait; //
+
+select .. for update skip locked;
+
+例子：
+
+| 事务 1                                               | 事务 2                                                                                                  |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| begin;                                               | begin;                                                                                                  |
+| select \* from user where id = 1 lock in share mode; |                                                                                                         |
+|                                                      | update user set name='Jack1' where id = 1;                                                              |
+| commit                                               | 事务 2 在 update 语句中尝试获取该记录的 X 锁，但是因为事务 1 还未释放 S 锁或者 X 锁，所以一直阻塞等待。 |
+|                                                      | 此时事务 2 获得该记录的 X 锁，update 语句执行成功。                                                     |
+|                                                      | commit                                                                                                  |

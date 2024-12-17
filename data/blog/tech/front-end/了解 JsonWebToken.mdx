@@ -1,0 +1,106 @@
+---
+title: 了解 JsonWebToken
+date: '2021-03-26'
+tags: ['web']
+draft: false
+authors: []
+---
+
+**JWT**(json web token)是一种开源的([RFC7519](https://tools.ietf.org/html/rfc7519))，工业级别的，用于客户端服务端鉴权的协议机制。
+
+通常有三部分组成 `header` ，`payload` ， `signature` 。
+
+**header**
+
+```json
+{
+  "alg": "HS256",
+  "typ": "JWT"
+}
+```
+
+alg 指明摘要算法的类型, 基本上我们可以使用任何摘要算法，如HMAC SHA256, SHA512,MD5 等。
+
+**payload**
+payload分为三个部分
+
+- 标准中注册的声明
+- 公共的声明
+- 私有的声明
+
+**标准中注册的声明 (建议但不强制使用) ：**  
+iss: jwt签发者
+sub: jwt所面向的用户
+aud: 接收jwt的一方
+exp: jwt的过期时间，这个过期时间必须要大于签发时间
+nbf: 定义在什么时间之前，该jwt都是不可用的.
+iat: jwt的签发时间
+jti: jwt的唯一身份标识，主要用来作为一次性token,从而回避重放攻击
+
+**公共的声明 ：**
+
+公共的声明可以添加任何的信息，一般添加用户的相关信息或其他业务需要的必要信息.但不建议添加敏感信息，因为该部分在客户端可解密.
+
+**私有的声明 ：**
+
+私有声明是提供者和消费者所共同定义的声明，一般不建议存放敏感信息，因为base64是对称解密的，意味着该部分信息可以归类为明文信息。
+
+```json
+{
+  "sub": "1234567890",
+  "name": "John Doe",
+  "iat": 1516239022
+}
+```
+
+**signature**
+signature 的部分是将 header 和 payload 分别用 base64 编码之后，用 `.` 连接起来，再使用 header 中指定的摘要算法进行计算（需要 secret ），最后得到 jwt 字符串。
+
+```javascript
+// javascript
+let encodedString = base64UrlEncode(header) + '.' + base64UrlEncode(payload)
+let signature = HMACSHA256(encodedString, 'secret') // TJVA95OrM7E2cBab30RMHrHDcEfxjoYZgeFONFh7HgQ
+let jwttoken = encodeString + '.' + signature
+```
+
+**工作流程一般是：**
+
+1. 用户使用账号密码登录
+2. 服务器根据登录的用户生成一个jwttoken，在 payload 部分可以携带部分用户信息，如用户id
+3. 客户端之后每次发送请求的时候都携带这个 jwttoken 以供服务器鉴权
+
+**思考**
+
+1. 传统的 session token 需要在服务器上面缓存，而且一般是在内存中，这不利于扩展，后期对服务器的压力不可忽略。并且无法解决分布式站点单点登录 SSO 的问题。而 JWT 方式不需要服务器缓存，它只需要在请求中校验。
+2. 基于 cookie 的 session 验证容易被利用来进行 CSRF 攻击(跨站伪造请求)。
+3. 在 JWT 的 payload 部分不应该放敏感信息，因为这部分只是经过 base64 编码而已，相当于明文。
+4. secret 至关重要，不应泄露，否则别人会伪造token。
+5. JWT 最好是配合 https 使用，防止请求被拦截。
+
+**单点登录**
+
+JWT token 的**生成**和**验证**可以不在同一个服务中。
+验证的时候只需要将 header 和 payload 部分连接起来，用 header 中指定的 `alg` 算法进行摘要生成 signature。
+然后比较这个 signature 和 token 中的 signature 是否一致，就可以判断是否有效。
+
+这个天然的去中心化很适合用来实现单点登录。
+
+> 单点登录英文全称Single Sign On，简称就是SSO。它的解释是：
+> **在多个应用系统中，只需要登录一次，就可以访问其他相互信任的应用系统。**
+
+1. 用户在系统 A登录，获得 jwt token。
+2. 用户使用 A 系统的 token 去访问 B 系统的资源，由于 A,B 系统使用相同的 JWT 密钥，那么 A 系统下发的 token， 在 B 系统也是有效的。
+
+**撤销 JWT token ?**
+
+jwt token 在 `exp` 过期时间前都是有效的。JWT token 一旦下发，服务端就不能主动撤销该 token 的有效性。
+也就是说服务端不能对已经下发的 token 修改过期时间，相当于将 session 状态交由了客户端管理，服务端无法拒绝该 JWT 的请求（无法踢除用户）
+
+有两种方案可以缓解这种无法拒绝服务的问题：
+
+1. 黑名单 jwt
+2. 和 refreshToken 配合的新交换方式。
+
+[read more](https://qastack.cn/programming/31919067/how-can-i-revoke-a-jwt-token)
+
+🤣 这两种方式都需要服务端多维护一个 blacklist 或者是 refresh token， 所以为什么和传统的方案，将 session 存储于服务端没啥区别，😝甚至是更复杂啦。。。。。

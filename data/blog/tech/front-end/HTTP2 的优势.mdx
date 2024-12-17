@@ -1,0 +1,77 @@
+---
+title: HTTP2 的优势
+date: '2018-08-01'
+tags: ['web']
+draft: false
+authors: []
+---
+
+> HTTP2 协议的目标是保持HTTP/1.x向后的语义兼容的情况下，降低网络延迟，提高传输效率。
+>
+> 相比于HTTP/1.x，它具备以下提高网络传输性能的新特性：
+
+## 多路复用
+
+允许通过一个单一的HTTP/2连接来发起多重请求。这个特性使得我们需要针对HTTP/1.x做的线头阻塞优化(css sprite, inline image)变得多余。也就是说在HTTP/2协议中，我们可以不再需要将多个请求合并为一个单一的请求，来减少多次建立连接带来的延迟。
+
+## 首部压缩
+
+首部压缩移除了一些啰嗦的首部，减少传输的数据
+
+## 服务端推送
+
+对于一个请求，可以有多个响应。其中的一个场景是，当客户端请求一个html文件的时候，服务端除了响应html文件之外，还可以向客户端推送这个html中可能使用到的css，js，image文件。避免不必要的round trip。
+
+服务端推送的一个问题就是，服务端有时可能重复推送客服端缓存的内容，造成多余的传输数据。其中的一个解决办法是，客户端增加一个Cache Digest 来告诉服务端哪些内容是缓存的。
+
+## 加密传输
+
+因为现阶段的浏览器没有一个支持未加密的 http/2的，所以 HTTP/2 都是加密的。
+
+[图解HTTPS 协议加密](https://mp.weixin.qq.com/s/acs3Vd00WIN-KhD-tLcFRA)
+
+## 二进制分帧
+
+在HTTP/2中，数据都被拆分成了帧，在客户端或者服务端中，通过帧信息来重新组合一个请求的完整数据。这就解决了上述的问题。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1595516305768-80a8b3af-4cfe-4549-b7ca-ec4fc36bd76b.png"
+    fill={true}
+  />
+</div>
+
+## HTTP/1.x的keep-alive
+
+keep-alive 允许设置空闲连接超时时长和最大连接数。一个包含keep-alive的响应头如下：
+
+> HTTP/1.1 200 OK
+>
+> Connection: Keep-Alive
+>
+> Content-Encoding: gzip
+>
+> Content-Type: text/html; charset=utf-8
+>
+> Date: Thu, 11 Aug 2016 15:23:13 GMT
+>
+> Keep-Alive: timeout=5, max=1000
+>
+> Last-Modified: Mon, 25 Jul 2016 04:32:39 GMT
+>
+> Server: Apache
+
+如上，表示该连接最大空闲时间为5ms，并且该连接所能允许的最大请求数为1000。超过1000个请求之后，自动断开连接。这个有点像HTTP/2中的多路复用。虽然他们都是复用一个连接来完成多次请求，但是其实他们是有区别的。
+
+在 **HTTP/1.x中在一个连接中发送多个请求必须是有序的** ，也就是说必须是请求1完成了才能发送请求2。假设请求1的响应需要等待比较长的操作(IO操作，数据库拆查询),那么在等待的这段时间中，服务器到客户端的链路中是没有数据传输的，我们希望的在请求1等待响应的这段时间中，能够传输一些请求2的内容。这样，整体的传输时间就会减少。
+
+参考：
+
+[HTTP/2.0 相比1.0有哪些重大改进？](https://www.zhihu.com/question/34074946)
+
+[HTTP/2 对现在的网页访问，有什么大的优化呢？体现在什么地方？](https://www.zhihu.com/question/24774343/answer/96586977)
+
+[keep-alive](https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Keep-Alive)

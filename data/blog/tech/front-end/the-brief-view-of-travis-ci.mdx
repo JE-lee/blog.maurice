@@ -1,0 +1,128 @@
+---
+title: Travis CI 持续集成服务
+date: '2018-03-18'
+tags: ['web', 'font-end']
+draft: false
+authors: []
+---
+
+在软件开发的过程中，有很大一部分的时间都是花在构建（build）和测试（test）上面。为了提高开发的效率，使用构建和测试的自动化工具就变得很有必要。 **travis ci **就是这样一种持续集成的工具，依托github平台的资源，它已经是份额最大的持续集成平台之一。
+
+## 如何拥有travis 项目
+
+首先我们使用**GITHUB账号登录travis ci**。在登录时，授权travis拥有我们github仓库的**所有权限**，以便读取我们的仓库信息，监听pull request, push 等action。
+
+登录完成之后，在仓库列表中选择一个项目加入travis。需要注意的是，加入的项目的根目录 下必须得有**对应的 **`**.travis.yml**`** 配置文件**，才会触发测试和构建。
+
+## travis 配置
+
+先从一份最简单的配置开始：（完成的配置文档可以参考[这里](https://config.travis-ci.com/)）
+
+```yaml
+language: node_js # 需要构建和测试的语言为node.js
+node_js:
+	- lts/* # 指定node.js 的版本
+branches:
+  only: # 只在master 和 release 分支上面运行构建
+    - master
+    - release
+cache: yarn # 使用yarn 缓存依赖
+```
+
+travis 对于node.js项目的默认构建脚本是 `npm test` 。也就是说上面的配置让你每次提交代码到master或者release分支时都会运行 `npm test` 测试。如果返回 `npm test` 返回非零，则认为此次构建测试失败。
+
+任何一次构建都可以视为一次 `job` ，而每一个 `job` 都会经历以下的[lifecycle](https://docs.travis-ci.com/user/job-lifecycle):
+
+- OPTIONAL Install apt addons
+- OPTIONAL Install cache components
+- **before_instal**l
+- **install**
+- **before_script**
+- **script**
+- OPTIONAL before_cache (for cleaning up cache)
+- **after_success or after_failure**
+- OPTIONAL before_deploy
+- **OPTIONAL deploy**
+- OPTIONAL after_deploy
+- **after_script**
+
+对于node.js项目，在install阶段，travis默认使用npm 安装项目依赖，如果项目中有 `yarn.lock` 文件，则会使用yarn 安装依赖。
+
+在job的每一个阶段用户都可以自定义，例如你可以在script 阶段执行自定义测试命令：
+
+```yaml
+script:
+	- echo "全量测试"
+  - curl http://analysis/cout?from=travis
+  - npx mocha && yarn clean
+```
+
+## jobs， stage
+
+`jobs` 和 `stage` 都是用来组合任务的，不同的是，jobs 的执行顺序是**线性的**，而且只有当前面的job 成功后，才会开始后面的job。同一个stage下面的任务是并行执行的，其中一个任务失败，并不会影响同一stage另外任务的执行结果。
+
+```yaml
+jobs:
+  include:
+    - script: ./test 1 # uses the default stage name "test"
+    - script: ./test 2
+    - stage: deploy
+       - script: ./deploy target-1
+       - script: ./deploy target-2 #
+```
+
+上面的配置会有四个job， 其中第一个和第二个同属 `test stage` ,他们并行执行，当这两个测试都通过以后，就会进行 `deploy stage` ，然后同时执行两个 `deploy script` 。
+
+## 发布到npm
+
+通常我们在master分支上面测试通过之后，需要合并到release分支上面发布到npm包。travis 在deploy阶段可以帮助我们做到这一点。
+
+1. 首选我们在npm上面授权accesstoken。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1586173323291-c20fa37d-7008-4fb3-b528-581303c983ab.png"
+    fill={true}
+  />
+</div>
+
+2. 然后加密我们的token
+
+```bash
+# 在此之前需要安装ruby
+
+# 设定gem 源
+gem sources -a https://rubygems.org/
+gem install travis
+
+# 安装成功后加密你的npm token,这一步有可能需要你使用github账号登录
+travis encrypt your-npm-token --add deploy.secure
+```
+
+3. 指定只有在release分支上面才发布
+
+```yaml
+language: node_js
+node_js:
+  - lts/*
+branches:
+  only:
+    - master
+    - release
+script:
+  - yarn test
+deploy:
+  provider: npm # 指定需要发布到npm
+  email: 1245183029@qq.com # 包拥有者的email
+  skip_cleanup: true
+  # 加密的npm token
+  secure: OXEFFIUEVityBW3GYcZqp0zKZM3ky0wDLp/Ie+kkNDiQmNcuoa4GhCVPj2OWRmqWM6Kxy2HBk/2Mdk6q8710HHBXLPzkJbbmfDRzDqzhsOzYxkL0ro7BgWNOlLREh7ex+J/znOvlRcr/hvNunT1wVGdpCmg/ZFDkNk0m9fEkuNYK2cQXkVZp8hURkfP7R/Ub8L75s/CdJ9z2AuRbVtwf0pAZ9phvqatWqDsXMaR1zICYf8o/Elq7Ujhag+G7djW5Zk6owAzIfuj86GvVwY6KEFdePw2JfCZEg9WUii2c7UQrLHwR67+5OcmUc+jQT2+MyA3ErXBQDsP+N5iPanXBdfLJK2F52nqJgEpXEa8CNDFMzUukBFiB8doDJMaPJSfk1FmCi4ejTr4EdfXkM9LiwncDT551+CiuxQbTWm0snZqXExPDl9T5No1hYJq7Is9khJw4tc+Vfxo6nka+/bZYqlUScc6nUrChreYBYV/5odNyll+ef9nZ8vHglQsroOuR7ghb9pKDXaBCqgg09P1JK7LTEUfuChHcPOVlZ4XQzLB4jMtxC9Y/tzoscH3HKWk8bgIQ2/AALRucmwD6NKhsWYwVTwejzho37kxRG5xVAat8q7O/t2mrvOfYXOATPefZurPDT5NBmtp4Kt3pNY1ZUzPPNvR37fQoWNZF+Q4PP34=
+  # 只在release 分支才会进行deploy
+  on: release
+cache: yarn
+```
+
+[参考](https://docs.travis-ci.com/user/build-stages/deploy-npm/)

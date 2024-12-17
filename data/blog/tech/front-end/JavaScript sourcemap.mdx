@@ -1,0 +1,133 @@
+---
+title: JavaScript sourcemap
+date: '2022-04-29'
+tags: ['web']
+draft: false
+authors: []
+---
+
+先放一个 v3 的 [spec](https://docs.google.com/document/d/1U1RGAehQwRypUTovF1KRlpiOFze0b-_2gc6fAH0KY0k/edit) 。
+
+## 影不影响网页性能
+
+不影响，sourcemap 只有在打开 devtool 的时候才加载。
+
+## webpack 中的 sourcemap 配置
+
+| **devtool**                              | **performance**                         | **production** | **quality**    | **comment**                                                                           |
+| ---------------------------------------- | --------------------------------------- | -------------- | -------------- | ------------------------------------------------------------------------------------- |
+| (none)                                   | **build**: fastest **rebuild**: fastest | yes            | bundle         | Recommended choice for production builds with maximum performance.                    |
+| **eval**                                 | **build**: fast **rebuild**: fastest    | no             | generated      | Recommended choice for development builds with maximum performance.                   |
+| eval-cheap-source-map                    | **build**: ok **rebuild**: fast         | no             | transformed    | Tradeoff choice for development builds.                                               |
+| eval-cheap-module-source-map             | **build**: slow **rebuild**: fast       | no             | original lines | Tradeoff choice for development builds.                                               |
+| **eval-source-map**                      | **build**: slowest **rebuild**: ok      | no             | original       | Recommended choice for development builds with high quality SourceMaps.               |
+| cheap-source-map                         | **build**: ok **rebuild**: slow         | no             | transformed    |                                                                                       |
+| cheap-module-source-map                  | **build**: slow **rebuild**: slow       | no             | original lines |                                                                                       |
+| **source-map**                           | **build**: slowest **rebuild**: slowest | yes            | original       | Recommended choice for production builds with high quality SourceMaps.                |
+| inline-cheap-source-map                  | **build**: ok **rebuild**: slow         | no             | transformed    |                                                                                       |
+| inline-cheap-module-source-map           | **build**: slow **rebuild**: slow       | no             | original lines |                                                                                       |
+| inline-source-map                        | **build**: slowest **rebuild**: slowest | no             | original       | Possible choice when publishing a single file                                         |
+| eval-nosources-cheap-source-map          | **build**: ok **rebuild**: fast         | no             | transformed    | source code not included                                                              |
+| eval-nosources-cheap-module-source-map   | **build**: slow **rebuild**: fast       | no             | original lines | source code not included                                                              |
+| eval-nosources-source-map                | **build**: slowest **rebuild**: ok      | no             | original       | source code not included                                                              |
+| inline-nosources-cheap-source-map        | **build**: ok **rebuild**: slow         | no             | transformed    | source code not included                                                              |
+| inline-nosources-cheap-module-source-map | **build**: slow **rebuild**: slow       | no             | original lines | source code not included                                                              |
+| inline-nosources-source-map              | **build**: slowest **rebuild**: slowest | no             | original       | source code not included                                                              |
+| nosources-cheap-source-map               | **build**: ok **rebuild**: slow         | no             | transformed    | source code not included                                                              |
+| nosources-cheap-module-source-map        | **build**: slow **rebuild**: slow       | no             | original lines | source code not included                                                              |
+| nosources-source-map                     | **build**: slowest **rebuild**: slowest | yes            | original       | source code not included                                                              |
+| hidden-nosources-cheap-source-map        | **build**: ok **rebuild**: slow         | no             | transformed    | no reference, source code not included                                                |
+| hidden-nosources-cheap-module-source-map | **build**: slow **rebuild**: slow       | no             | original lines | no reference, source code not included                                                |
+| hidden-nosources-source-map              | **build**: slowest **rebuild**: slowest | yes            | original       | no reference, source code not included                                                |
+| hidden-cheap-source-map                  | **build**: ok **rebuild**: slow         | no             | transformed    | no reference                                                                          |
+| hidden-cheap-module-source-map           | **build**: slow **rebuild**: slow       | no             | original lines | no reference                                                                          |
+| hidden-source-map                        | **build**: slowest **rebuild**: slowest | yes            | original       | no reference. Possible choice when using SourceMap only for error reporting purposes. |
+
+## 如何定位到 sourcemap 文件
+
+一般在转换压缩后的代码文件最后一行指明：
+
+```javascript
+//# sourceMappingURL=chunk-f20d8ca0.b2da0904.js.map
+```
+
+如果是 inline-source-map, 则是以base64 字符串的形式添加在文件末尾
+
+```javascript
+//# sourceMappingURL=data:...base64
+```
+
+## 组成
+
+一个 sourcemap 文件由下面几个元素
+
+- version：Source map的版本，目前为3。
+- file：转换后的文件名。
+- sourceRoot：转换前的文件所在的目录。如果与转换前的文件在同一目录，该项为空。
+- sources：转换前的文件。该项是一个数组，表示可能存在多个文件合并。
+- names：转换前的所有变量名和属性名。
+- mappings：记录位置信息的字符串。
+
+## mappings
+
+mappings 是类似于下面这样的字符串
+
+```javascript
+mappings: 'AAAAA,BBBBB;CCCCC'
+```
+
+主要含义：
+
+第一层是**行对应**，以分号（;）表示，每个分号对应转换后源码的一行。所以，第一个分号前的内容，就对应源码的第一行，以此类推。
+
+第二层是**位置对应**，以逗号（,）表示，每个逗号对应转换后源码的一个位置。所以，第一个逗号前的内容，就对应该行源码的第一个位置，以此类推。
+
+第三层是**位置转换**，以[VLQ编码](https://en.wikipedia.org/wiki/Variable-length_quantity)表示，代表该位置对应的转换前的源码位置。
+
+## 位置如何对应
+
+每个位置使用5位，注意这里的位不是指一个字符，一位可能有多个字符，取决于 base64-vlq 编码。
+
+- 第一位，表示这个位置在（转换后的代码的）的第几列。
+- 第二位，表示这个位置属于sources属性中的哪一个文件。
+- 第三位，表示这个位置属于转换前代码的第几行。
+- 第四位，表示这个位置属于转换前代码的第几列。
+- 第五位，表示这个位置属于names属性中的哪一个变量。
+
+**mappings 中位置坐标是相对的，即位置中的数值表示相对于前一个位置偏移了多少(vlq 可以表示正负数)**
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2022/png/438262/1646878337098-d88460d7-1f5e-4bef-a543-928c25fdf493.png"
+    fill={true}
+  />
+</div>
+
+## 为什么使用 vlq 编码
+
+vlq 编码的特点就是可以精简表示非常大的数值，节省数据的传输大小。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2022/png/438262/1646878055010-7ccb9010-09d0-4da2-acbe-a3b18e10d7c9.png"
+    fill={true}
+  />
+</div>
+
+[base64-vlq online](https://www.murzwin.com/base64vlq.html)
+
+## reference
+
+[万字长文：关于sourcemap，这篇文章就够了](https://mp.weixin.qq.com/s/wLyNOvdCvtmVr8wXAgKaiA)
+
+[JavaScript Source Map 详解](https://www.ruanyifeng.com/blog/2013/01/javascript_source_map.html)
+
+[introdution sourcemap](https://blog.teamtreehouse.com/introduction-source-maps)
+
+[sourcemap 原理](https://cloud.tencent.com/developer/article/1598223)

@@ -1,0 +1,161 @@
+---
+title: 服务端渲染的简单理解
+date: '2019-03-24'
+tags: ['web']
+draft: false
+authors: []
+---
+
+服务端渲染的好处：
+
+- SEO友好
+- 减少首屏时间
+
+在这篇文章中，主要记录了 Vue 项目服务端渲染方式的实施。
+
+## Vue Cli 工程服务端渲染
+
+### 前置知识
+
+### vue-router 的导航守卫
+
+1. 导航被触发。
+2. 在失活的组件里调用 `beforeRouteLeave`
+3. 调用全局的 `beforeEach` 守卫
+4. 在可重用的组件里面调用 `beforeRouteUpdate` 。
+5. 在路由配置里调用 `beforeEnter`
+6. 解析异步的路由组件
+7. 在激活的组件里调用 `beforeRouteEnter`
+8. 调用全局的 `beforeResolve`
+9. 导航被确认 `onReady`
+10. 调用全局的 `afterEach`
+11. 触发 `dom` 更新
+12. 用创建好的实例调用 `beforeRouteEnter` 守卫中传给 `next` 的回调参数，其中组建实例作为函数参数被传入
+
+### 编程时应该提前注意的点
+
+1. 服务端渲染的时候只有组件的 `beforeCreated`  和 `created` 钩子才会调用，且无法在这两个钩子函数中使用window 中的任何对象。
+2. 尽量减少指令的使用，或者提供一个服务端的指令版本。应该尽可能地使用组件来完成抽象
+3. 对于第三方库，应该注意以上的第一条原则，适当地进行服务端的 polyfill。
+4. router 提供一个 `onReady` 钩子函数，在路由完成初始导航时调用。
+5. `router.getMatchedComponents`  只限于页面组件，也就是路由组件。
+
+### 挂载的区别
+
+#### 客户端
+
+客户端挂载的时候，需要在路由被确认的时候，调用组件里面的asyncData函数来获取数据
+
+```javascript
+router.beforeResolve(to, from, next){
+	// 获得 to这个route匹配到的组件
+	let matchComponents = route.getMatchedComponents(to),
+		asyncDatas = matchComponents.map(comp => comp.asyncData)
+
+	Promise.all(asyncDatas.map(hook => hook && hook(route: to, store))).then(next).catch(next)
+```
+
+**何时在客户端注册 **`**beforeResolve**`
+
+当我们第一次访问应用的时候，`onReady` 钩子函数先于 `beforeResolve` 执行，又因为我们已经在服务端已经获取到了第一个路由所需要的数据，所以我们应该在第一个路由确认之后再注册这个 `beforeResolve`
+
+```javascript
+route.onReady(() => {
+  router.beforeResolve()
+})
+```
+
+最后以激活模式挂载
+
+```javascript
+// 有 data-server-rendered 属性就会使用激活模式挂载
+// 也可以传入第二个参数 true 强制使用激活模式挂载
+app.$mount('#app', true)
+```
+
+#### 服务端
+
+在服务端的时候，并不执行挂载动作。因为服务端并没有浏览器环境，无法挂载。
+
+服务端的入口js需要导出一个返回值为Promise的函数
+
+在导航初次确认的守卫中，获取当前路由的数据，之后设置 `window.__INITIALSTATE__`
+
+```javascript
+export default (context) => {
+  // check url
+  let { router, store, app } = createApp()
+  const url = context.url
+  const { fullPath } = router.resolve(url).route
+  if (fullPath !== url) {
+    return Promise.reject({ url: fullPath })
+  }
+
+  // navigate to url
+  router.push(url)
+  return new Promise((resolve, reject) => {
+    router.onReady(() => {
+      const matchComponents = router.getMatchedComponents()
+      if (!matchComponents.length) {
+        return reject({ code: 404 })
+      }
+
+      // wait async data
+      return Promise.all(
+        matchComponents.map(
+          ({ asyncData }) => asyncData && asyncData({ route: router.currentRoute, store })
+        )
+      )
+        .then(() => {
+          // window.__INITIAL_STATE__
+          context.state = store.state
+          resolve(app)
+        })
+        .catch(reject)
+    })
+  })
+}
+```
+
+### 打包
+
+需要分开打包客户端和服务端所以用的版本。
+
+其中服务端版本不需要压缩和 code-spliting , 客户端和服务端版本需要 VueSSRServerPlugin 和 VueSSRClientPlugin 来互相映射。
+
+可以说打包脚本是固定的，需要的时候互相参考之前的项目就可以了。
+
+打包之后将会生成两个很重要的json文件。vue-ssr-client-manifest.json 和 vue-ssr-server-bundle.json。
+
+其中 vue-ssr-server-bundle.json 是整个项目的代码，包括 js, css。
+
+为了保持这两个 json 的映射关系是正确的，需要注意保持两端的打包脚本 entry，ouput是一样的配置。
+
+当然服务端的打包脚本可以指定output.libraryTarget 为‘commonjs2’。因为服务端脚本打包的文件是在node环境下加载的。
+
+## Nuxt 服务端渲染
+
+Nuxt 是基于 Vue 的第三方框架，使用 Nuxt 可以很方便地继承服务端渲染。在每一个 Page 组件中，都提供了一个 `asyncData` 或者是 `fetch` 方法来获取数据。在服务端，或者切换至目标路由的时候，都会调用这两个函数，而且注意是在组件初始化之前调用，这就意味着你不能访问当前组件实例。
+
+但是 `asyncData` resolve 的数据会被设置为组件数据，而 `fetch` 函数的结果则不会。在调用的时候，会传入 [context](https://zh.nuxtjs.org/api/context) 对象。
+
+```javascript
+export default {
+  asyncData({ $axios }) {
+    return $axios.get('xxxx').then((res) => res.data)
+  },
+  fetch({ params, store, $axios }) {
+    $axios.get('xxxx').then((res) => store.commit('xx', res.data))
+  },
+}
+```
+
+### 部署
+
+```bash
+# 修改 nuxt.config.js 的 mode 为 universal
+# 打包
+nuxt build
+# 启动服务
+nuxt start
+```

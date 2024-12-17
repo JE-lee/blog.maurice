@@ -1,0 +1,204 @@
+---
+title: Nest.js 初识
+date: '2023-01-23'
+tags: ['web']
+draft: false
+authors: []
+---
+
+NestJS 通过依赖注入(DI)的方式来管理`module` `controller` `service` 等各个系统组件，并且在 API 的请求到响应的过程抽离出了多个切面，`guard` `interceptor` `pipe` `filter` `middleware` 。
+
+### **module 的初始化过程**
+
+被 NestJS DI 系统接管的 class (被 `@Injectable` 修饰) ，都有相同的生命周期。他们在初始化和销毁的过程中，其生命周期顺序是这样的。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2023/png/438262/1698330784913-9f123775-0f70-4ab3-94f8-4e729e901a46.png"
+    fill={true}
+  />
+</div>{' '}
+
+在整个 module tree 中，`onModuleInit`  `onApplicationBootstrap` `onModuleDestroy` `beforeApplicationShutdown` 都是 **从下往上** 依次执行，也就是先执行子模块再执行父模块的生命周期函数。
+
+### provider 的形式
+
+1. **类提供**，注入的是一个类，需要 DI 来实例化。 `useClass`
+
+```typescript
+@Module({
+	providers: [
+		CatService, // #1：简写形式
+		{ // #2: 用 class 作为 token
+			provide: CatService,
+			useClass: CatService,
+		},
+		{ // #3: 用 string 或者 symbol 作为 token
+			provide: 'cat-service',
+			useClass: CatService
+		}
+	]
+})
+clas AppModule {}
+```
+
+2. **值提供**，注入的是 JS 值，不需要实例化。`useValue`
+
+```typescript
+@Module({
+	providers: [
+
+		{ // #2: 用 class 作为 token
+			provide: CatService,
+			useValue: { hello: () => {} },
+		},
+
+	]
+})
+clas AppModule {}
+```
+
+3. **动态提供**，具体注入的值根据 `useFactory` 返回的值（如果返回的是 class, 不会自动实例化，需要自己手动实例化）确定。`useFactory` 可以接受其他注入的值作为参数，其顺序与 `inject` 指定的顺序一致。
+
+```typescript
+const connectionProvider = {
+  provide: 'CONNECTION',
+  useFactory: (optionsProvider: OptionsProvider, optionalProvider?: string) => {
+    const options = optionsProvider.get()
+    return new DatabaseConnection(options)
+  },
+  inject: [OptionsProvider, { token: 'SomeOptionalProvider', optional: true }],
+  //       \_____________/            \__________________/
+  //        This provider              The provider with this
+  //        is mandatory.              token can resolve to `undefined`.
+}
+
+@Module({
+  providers: [
+    connectionProvider,
+    OptionsProvider,
+    // { provide: 'SomeOptionalProvider', useValue: 'anything' },
+  ],
+})
+export class AppModule {}
+```
+
+4. **异步提供**。 useFactory 函数可以返回一个 Promise。 NestJS 会在 Promise fulfill 后再出入结果值。
+
+```typescript
+{
+  provide: 'ASYNC_CONNECTION',
+  useFactory: async () => {
+    const connection = await createConnection(options);
+    return connection;
+  },
+}
+```
+
+### 静态模块和动态模块
+
+静态模块的导入行为是固定的，主模块无法影响导入的模块。  
+动态模块支持导入的的时候**自定义该模块的属性和行为**。
+
+```typescript
+import { Module } from '@nestjs/common'
+import { AppController } from './app.controller'
+import { AppService } from './app.service'
+import { ConfigModule } from './config/config.module'
+
+@Module({
+  imports: [ConfigModule.register({ folder: './config' })],
+  controllers: [AppController],
+  providers: [AppService],
+})
+export class AppModule {}
+```
+
+ConfigModule.register 返回 DynamicModule。DynamicModule 的签名和 @Module() 的参数签名一样，并且必须得有 module 属性。
+
+```typescript
+import { DynamicModule, Module } from '@nestjs/common'
+import { ConfigService } from './config.service'
+
+@Module({})
+export class ConfigModule {
+  static register(): DynamicModule {
+    return {
+      module: ConfigModule,
+      providers: [ConfigService],
+      exports: [ConfigService],
+    }
+  }
+}
+```
+
+ConfigModule.register 函数名称不是强制的，可以是任何名称，但是[@nestjs ](/nestjs) 一般遵循一下原则。
+
+- register: 动态配置模块，只在消费模块中可见
+- forRoot: 希望在多个模块中重用这个配置
+- forFeature: 希望对于不同的模块用不同的配置，但是通用的配置已经在 forRoot 中制定。
+
+forRoot 和 forFeature 的区别，想想 @nestjs/typeorm。  
+以上方法都有对应的 async 版本，表示异步模块。
+
+### 注入的方式
+
+有两种注入的方式：
+
+- constructor injection
+- property-base injection
+
+对于异步 provider 来说，这两种方式可能有些区别。
+
+在 constructor 中无法访问异步的 property-injection ，因为在构造函数阶段，此时的异步 provider 还没有 resolved，此时需要改为 constructor-injection 的方式。
+
+### Injection scope
+
+- Scope.DEFULT    以单一实例的形式在整个系统中共享
+- Scope.REQUEST  为每一个请求创建一个新的实例
+- Scope.TRANSIENT  为每一次注入创建一个新的实例
+
+Scope.REQUEST 和 Scope.TRANSIENT 的区别是 Scope.REQUEST 的注入在请求期间是共享的，而 Scope.TRANSIENT 是每一次注入都是全新的实例。
+
+Scope.REQUEST  是会冒泡的，也就是说如果一个依赖(controller, service等)依赖的某个子模块是 Scope.REQUEST， 那么该依赖也会变成 Scope.REQUEST.
+
+Scope.TRANSIENT 不会冒泡，不会影响上一级模块的 scope。
+
+### 各个切面的协作过程
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2023/png/438262/1698330855428-72aa3e51-d2a7-46eb-a603-c6052341283c.png"
+    fill={true}
+  />
+</div>{' '}
+
+### middleware
+
+如果底层引擎使用的是 express ，那么这里的 middle 就和 express middleware 没有任何差异。可以无缝衔接 express 的生态。
+
+### Guard
+
+守卫一般用来做鉴权，是否需要登陆，是否有对应路由权限等。
+
+### Interceptor
+
+interceptor 横跨 Pipe 和 Route Handler , 可以使用 `rxjs` 在前后添加逻辑，比如可以在 handler 之后格式化响应的结构体。
+
+### Pipe
+
+一般执行路由参数验证和转换。如 validationPipe, ParseIntPipe
+
+### handler
+
+路由逻辑处理。
+
+### ExceptionFilter
+
+前面路径各个切面抛出的错误都会被 Exception Filter 捕获，然后在这一层进行统一的处理。

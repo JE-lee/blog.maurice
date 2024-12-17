@@ -1,0 +1,162 @@
+---
+title: The Browser Cache
+date: '2018-03-14'
+tags: ['web', 'font-end']
+draft: false
+authors: []
+summary: '浏览器缓存的基本概念'
+---
+
+## 强缓存
+
+**Pragma, Expires, Cache-Control**通常就是我们说的强缓存，也叫非验证性缓存。通常被用于HTTP请求和响应中来实现缓存机制。
+
+它包含一系列可选的不区分大小写的指令，指令与指令之间用逗号隔开。其中Pragma和Expires时HTTP1.0中存在的，在HTTP1.1中使用Cache-Control代替。也就是说**Cache-Control会覆盖Pragma和Expires**
+
+## 协商缓存
+
+**在强缓存失效之后**，浏览器使用协商缓存（If-None-Match/If-Modified-Since）来决定资源是否有效。如果协商缓存验证为有效则返回304状态。
+
+## 使用场景
+
+- 对于静态资源，通常使用hash来控制版本，并且设置max-age为一个很长的过期时间。这样子可以减少带宽的消耗以及CDN的回流。
+
+```text
+Cache-Control: max-age = 31536000
+```
+
+- 对于可变的内容，我们不会也不应该缓存
+
+```text
+Cache-Control: no-cache,no-store,must-revalidate
+```
+
+- 使用no-cache通常需要配合ETag或者Last-Modified，这样客户端下一次请求的时候就会带上If-None-Match和If-Modified-Since，服务端判断资源未改变，就会响应304让客户端使用已缓存的内容。(chrome 的开发者工具显示的状态依然是200，但是此时传输的size是很小的。firefox的开发者工具显示的状态是304)。
+
+- 在这里注意no-cache和no-store的区别是，no-cahce依然会缓存请求的内容，但是在每次请求之前都会向服务器验证内容是否有效（协商缓存）。而no-store是完全不缓存内容。
+
+- max-age的优先级比no-cache要高。
+
+```text
+Cache-Control: no-cache,max-age=600
+```
+
+如上：在前一次请求之后的10分钟内（600s）,之后的相同请求都使用缓存。
+
+这里是[其他指令](https://developer.mozilla.org/zh-CN/docs/Web/HTTP/Headers/Cache-Control)的用法。
+
+## ETag
+
+```text
+ETag: "33a64df551425fcc55e4d42a148795d9f25f89d4
+```
+
+通常服务端使用文件的hash作为ETag标记（这里没有一个规定的ETag生成算法）,然后客户端在超过max-age的情况下请求就会带上If-Match来判断内容是否有修改。如果没有修改，就返回304让客户端使用缓存的内容。
+
+```text
+If-Match: "33a64df551425fcc55e4d42a148795d9f25f89d4"
+```
+
+## Last-Modified
+
+Last-Modified是另外一种标记资源是否过期的方式。
+
+```text
+Last-Modified: <day-name>, <day> <month> <year> <hour>:<minute>:<second> GMT
+Last-Modified: Wed, 21 Oct 2015 07:28:00 GMT // GMT string
+```
+
+原理同ETag，该字段表示的具体意义是内容最后的修改时间。
+
+## No Cache-Control
+
+**如果一个请求头只有ETag或者Last-Modified**，而没有明确指定Cache-Control，那么浏览器会采取什么策略对资源进行缓存呢？
+
+**对于这种情况各浏览器的表现不相同。**
+
+Safari和FireFox 会每次重新发起请求，并且带上If-None-Match 或者If-modified-since，来验证缓存是否有效。
+
+而Chrome则会直接从memory cache中读取。
+
+> 浏览器的缓存有 2 种。一种叫验证性缓存，用 ETag 、 Last-Modified 、 If-None-Match 、 If-Modified-Since 来控制，其特点是会发一个请求给服务器来确认缓存是否有效，如果有效就返回 304 ，省去传输内容的时间。另一种叫非验证性缓存，或者有些人称为强缓存，用 Cache-Control 、 Expires 、 Pragma 来控制，其特点是一但有效就在有效期内不会发任何请求到服务器。 从描述也能很容易看出来，非验证性缓存的优先级是高于验证性缓存的，因为有它在就根本不会发请求，自然也没有什么 If-None-Match 之类的东西出现的机会了。你看到的 200 from memory cache 就是非验证性缓存
+
+> 那么为什么在 Chrome 下会有非验证性缓存呢？就是因为你没有设置 Cache-Control 这个头，没有这个头的话，其默认值是 Private ，在标准中也明确说了：
+
+> Unless specifically constrained by a cache-control
+
+> directive, a caching system MAY always store a successful response
+
+翻译一下：如果没有 Cache-Control 进行限制，缓存系统**可以**对一个成功的响应进行存储
+
+很显然， Chrome 是遵守标准的，它在没有检查到 Cache-Control 的时候对响应做了非验证性缓存，所以你看到了 200 from memory cache。同时 Safari 也是遵守标准的，因为标准只说了**可以**进行存储，而非**应当**或者**必须**，所以 Safari 不进行缓存也是合理的
+
+我们可以理解为，没有 Cache-Control 的情况下，缓存不缓存就看浏览器高兴，你也没什么好说的。那么你如今的需求是“明确不要非验证性缓存”，则从标准的角度来说，你**必须**指定相应的 Cache-Control 头。
+
+以上内容来自[v2ex上的讨论](https://www.v2ex.com/t/356353)
+
+## from memory cache / from disk cache
+
+在webkit内核浏览中，经常会碰到200 from memory cache 或者 200 from disk cache的状态。
+
+- 200 from memory cache  
+  不访问服务器，直接读缓存，从内存中读取缓存。此时的数据时缓存到内存中的，当kill进程后，也就是**浏览器关闭以后，数据将不存在。**
+- 200 from disk cache
+- 不访问服务器，直接读缓存，从磁盘中读取缓存，当kill进程时，数据还是存在。
+
+这其中涉及到**三级缓存原理**。
+
+1. 先去内存看，如果有，直接加载 （200 from memory cache）
+2. 如果内存没有，择取硬盘获取，如果有直接加载（200 from disk cache）
+3. 如果硬盘也没有，那么就进行网络请求
+4. 加载到的资源缓存到硬盘和内存
+
+## from disk cache 的内容何时过期
+
+[RFC 4.2.2](https://tools.ietf.org/html/rfc7234#section-4.2.2) 内容规定，对于没有在响应头中明确指定过期时间的内容，缓存**可以**应用一个启发式的算法来决定过期时间。
+
+> Since origin servers do not always provide explicit expiration times,
+
+> a cache MAY assign a heuristic expiration time when an explicit time
+
+> is not specified.
+
+一个可能的启发算法是
+
+```text
+('date header value' - 'last-modified header value') * 10%
+```
+
+尚不清楚chrome的启发算法是什么，但是从RFC可知，from disk cache的内容是一定有一个过期时间的。
+
+## F5刷新和CTRL + F5 刷新
+
+F5刷新会让页面加载，**对于当前页面URL**，如果是上面no cache-control的情况，将会在请求头上强制加上max-age=0，来禁止使用缓存。
+
+而页面的其他资源有可能会应用浏览器的三级缓存，或者是经过和服务器的协商缓存命中304.
+
+CTRL + F5是强制刷新，会在资源请求的头部加上
+
+```text
+Cache-Control: no-cache
+Pragma: no-cache
+```
+
+这样子，浏览器就会向服务器重新请求资源，而不使用任何缓存。
+
+## no-cache 和 max-age=0, must-revalidate
+
+no cahce 指明响应会被浏览器缓存，但是每次请求都会到服务器验证(if-not-modified)。如果不想浏览器缓存响应，则应该使用 no-store。
+
+must-revalidate 指明缓存过期之后必须到服务器验证，即使是在没有网络的情况下，否则浏览器可能会使用过期的响应返回。
+
+## 参考：
+
+[HTTP请求中关于缓存的字段](http://www.fly63.com/article/detial/744)
+
+[关于只设置ETag/last-modified，没有指定Cache-Control的讨论](https://www.v2ex.com/t/356353)
+
+[何时from memory cache / from disk cache的讨论](https://www.zhihu.com/question/64201378)
+
+[浏览器缓存总结](https://excaliburhan.com/post/things-you-should-know-about-browser-cache.html)
+
+[no-cache与 must-revalidate](https://www.cnblogs.com/chyingp/p/no-cache-vs-must-revalidate.html)

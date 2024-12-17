@@ -1,0 +1,96 @@
+---
+title: svg icon 在前端项目中的应用
+date: '2019-05-08'
+tags: ['web']
+draft: false
+authors: []
+---
+
+svg（可伸缩矢量图）已经被各大浏览器支持。它具有如下几个特点
+
+> 1. 可以无限放大，完美解决高分率屏幕下图像显示不清楚的问题
+> 2. 图形线条比较简单的情况下，svg要比高清图要小
+> 3. svg比相应的高清图有更好的渲染性能。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="pixel pipe"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597419307228-0db8bc86-a633-4ab2-8085-78fe4034c595.png"
+    fill={true}
+  />
+</div>
+
+在一般的前端项目中，图标这类比较简单，比较小的文件一般都是用 svg 来制作的。通过在上设置 fill 属性的颜色就可以改变图标的颜色。
+
+```xml
+<svg fill="#fff">
+	<path></path>
+</svg>
+// 或者是
+svg{
+	fill: white;
+}
+```
+
+或者直接当成一张图片使用
+
+```javascript
+<img src="../assets/book.svg"/>
+body{
+	background-image: url('./svg/assets/book.svg')
+}
+```
+
+**在webpack中处理svg**
+
+一般将svg格式的文件当作图片来处理，其处理规则同png,jpg文件一样
+
+```javascript
+{
+	test: /\.(svg|png|jpg)/ ,
+	use: [
+		{
+			loader: 'url-loader',
+			options: { limit: 1000 }
+		}
+	]
+}
+```
+
+但是如果是用作图标的svg，我们更希望它能够拥有sprite 精灵的功能，同时又能够保留完整的svg特性，诸如设置svg的fill属性来达到变色的效果。这时候就可以使用[svg-sprite-loader。](https://www.npmjs.com/package/svg-sprite-loader)
+
+```javascript
+{
+	test: /\.svg/ ,
+	use: [
+		{
+			loader: 'svg-sprite-loader',
+			options: { symbolId: 'icon-[name]' }
+		}
+	]
+}
+```
+
+name是[interpolate name](https://github.com/webpack/loader-utils#interpolatename)的一部分。
+
+它的原理是将所有引入的svg都集中渲染在页面上，并且给每个symbol 加上id，通过 id 的方式在页面上使用。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="pixel pipe"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597419359961-cda421c7-c35f-4a1a-a760-7f2bb51345d9.png"
+    fill={true}
+  />
+</div>
+
+此时，我们就可以在页面中这样子使用
+
+```xml
+<svg fill="red">
+	<use xlink:href="icon-avater"></use>
+</svg>
+```

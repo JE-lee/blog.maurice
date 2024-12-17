@@ -1,0 +1,297 @@
+---
+title: TypeScript Point
+date: '2023-12-03'
+tags: ['web']
+draft: false
+authors: []
+---
+
+## --noEmitOnError
+
+当 `tsc` 编译出现错误的时候，将不会输出 `js` 文件。
+
+## this 的类型
+
+TypeScript 可以指定函数 this 的类型。
+
+```typescript
+interface DB {
+  filterUsers(filter: (this: User) => boolean): User[]
+}
+```
+
+## void and undefined
+
+void 在 TypeScript 中是不返回值的函数的返回值，它的意图是对于改函数的返回值不做任何处理。我们知道在 javascript 中，没有返回值的函数其结果是 undefined。但是在 TypeScript 中，void 和 undefind 并不能互换。
+
+1. 声明为 undefined 返回的函数就不能有任何返回，而声明为 void 的函数其返回可能是 undefind， 也可能是 any。
+
+```typescript
+function forEach<T>(arr: T[]): void {
+  return 2 as any // 正确
+}
+
+type voidFunc = () => void
+
+const f1: voidFunc = () => {
+  return true
+}
+
+const f2: voidFunc = () => true
+
+const f3: voidFunc = function () {
+  return true
+}
+```
+
+2. 类型推断的时候，任何函数都与声明为 void 的函数兼容。
+
+```typescript
+function forEach<T>(arr: T[], cb: (item: T) => void): void {
+  for (let i = 0; i < arr.length; i++) {
+    cb(arr[i])
+  }
+}
+
+const target: number[] = []
+forEach([1, 3], (item) => target.push(item)) // target.push() 返回 number
+```
+
+[https://stackoverflow.com/questions/58885485/why-does-typescript-have-both-void-and-undefined](https://stackoverflow.com/questions/58885485/why-does-typescript-have-both-void-and-undefined)
+
+如果要表示一个函数不返回任何值，可以使用 never。
+
+## unknown
+
+unknown 同 any 一样也是 TypeScript 中的顶级类型。TypeScript 不允许我们对类型为 unknown 的值执行任意操作。相反，我们必须首先执行某种类型检查（typeof instanceof）以缩小我们正在使用的值的类型范围。
+
+**联合类型中的 unknown**
+
+```typescript
+type UnionType1 = unknown | null // unknown
+type UnionType2 = unknown | undefined // unknown
+type UnionType3 = unknown | string // unknown
+type UnionType4 = unknown | number[] // unknown
+type UnionType5 = unknown | any // any
+```
+
+**交叉类型中的 unknown**
+
+```typescript
+type IntersectionType1 = unknown & null // null
+type IntersectionType2 = unknown & undefined // undefined
+type IntersectionType3 = unknown & string // string
+type IntersectionType4 = unknown & number[] // number[]
+type IntersectionType5 = unknown & any // any
+```
+
+[https://juejin.cn/post/6844903866073350151](https://juejin.cn/post/6844903866073350151)
+
+## 有静态方法的枚举
+
+可以使用 enum + namespage 给枚举类型添加静态方法。
+
+```typescript
+enum Weekday {
+  Monday,
+  Tuesday,
+  Wednesday,
+  Thursday,
+  Friday,
+  Saturday,
+  Sunday,
+}
+
+namespace Weekday {
+  export function isBusinessDay(day: Weekday) {
+    switch (day) {
+      case Weekday.Saturday:
+      case Weekday.Sunday:
+        return false
+      default:
+        return true
+    }
+  }
+}
+
+const mon = Weekday.Monday
+const sun = Weekday.Sunday
+
+console.log(Weekday.isBusinessDay(mon)) // true
+console.log(Weekday.isBusinessDay(sun))
+```
+
+## declare
+
+从文件模块中进入全局命名空间
+
+```typescript
+declare global {}
+```
+
+## readonly 索引
+
+可以制作索引签名
+readonly
+以防止对其索引进行分配
+
+```typescript
+interface ReadonlyStringArray {
+  readonly [index: number]: string;
+}
+
+let myArray: ReadonlyStringArray = getReadOnlyStringArray();
+myArray[2] = "Mallory";
+Index signature in type 'ReadonlyStringArray' only permits reading.
+```
+
+## infer
+
+infer 允许在 conditional types 中使用类型引用，类似于一种 pattern matching.
+
+```typescript
+type ParamsType<T> = T extends (...args: infer U) => any ? U : never
+type PF1 = ParamsType<(name: string) => number> // [name: string]
+type PF2 = ParamsType<(name: string, count: number) => void> // [name: string, count: number]
+
+type Split<T extends string, D extends string> = T extends `${infer U}${D}${infer R}`
+  ? [U, ...Split<R, D>]
+  : [T]
+type S1 = Split<'name,string,test', ','> // ['name', 'string', 'test']
+```
+
+[https://github.com/Microsoft/TypeScript/pull/21496](https://github.com/Microsoft/TypeScript/pull/21496)
+
+##
+
+## 重命名 key
+
+key remapping via as
+
+```typescript
+type Getters<Type> = {
+  [Property in keyof Type as `get${Capitalize<string & Property>}`]: () => Type[Property]
+}
+
+interface Person {
+  name: string
+  age: number
+  location: string
+}
+
+type LazyPerson = Getters<Person>
+// { getName: string, getAge: string, getLocation: string }
+```
+
+## Tuple 转 union
+
+```typescript
+type ElementOf<T> = T extends Array<infer E> ? E : never
+
+type TTuple = [string, number]
+
+type ToUnion = ElementOf<TTuple> // string | number
+
+// 或者
+type TTuple = [string, number]
+type Res = TTuple[number] // string | number
+```
+
+## Turing complete
+
+TypeScript 的类型是图灵完备的。
+
+[https://juejin.cn/post/6854573220738105357#heading-13](https://juejin.cn/post/6854573220738105357#heading-13)
+
+## 类型组合
+
+```typescript
+interface User {
+  name: string
+  year: number
+  say: never
+}
+
+type Key = User[keyof User] // number | string
+
+type K1 = string | number | never // string | number
+type K2 = string | number | void // string | number | void
+type K3 = string & number & never // never
+type K4 = string & number & void // never
+type K5 = string & void // never
+```
+
+## module 和 namespace
+
+在有 ES module 的情况下，为什么还需要 namespace?
+
+在 ES module 出现之前，TypeScript 自身的模块系统是 external model 和 inner module。ES module 出现之后，替代了原有的 external module，而为了不混淆概念，原有的 inner module 改为 namespace。
+
+[https://www.zhihu.com/question/65676593](https://www.zhihu.com/question/65676593)
+
+## interface 和 type
+
+1. type 可以声明类型别名，而 interface 不行
+2. interface 可以类型合并，而 type 不行
+
+```typescript
+interface User {
+  name: string
+}
+
+interface User {
+  year: string
+}
+```
+
+## 有用的栗子
+
+```typescript
+function map<Input, Output>(arr: Input[], func: (arg: Input) => Output): Output[] {
+  return arr.map(func)
+}
+
+// Parameter 'n' is of type 'string'
+// 'parsed' is of type 'number[]'
+const parsed = map(['1', '2', '3'], (n) => parseInt(n))
+```
+
+```typescript
+function longest<Type extends { length: number }>(a: Type, b: Type) {
+  if (a.length >= b.length) {
+    return a
+  } else {
+    return b
+  }
+}
+
+// longerArray is of type 'number[]'
+const longerArray = longest([1, 2], [1, 2, 3])
+// longerString is of type 'alice' | 'bob'
+const longerString = longest('alice', 'bob')
+// Error! Numbers don't have a 'length' property
+const notOK = longest(10, 100)
+```
+
+泛型约束：
+
+```typescript
+function getProperty<Type, Key extends keyof Type>(obj: Type, key: Key) {
+  return obj[key]
+}
+
+let x = { a: 1, b: 2, c: 3, d: 4 }
+
+getProperty(x, 'a')
+getProperty(x, 'm')
+```
+
+## TypeScript pratice
+
+一些 TypeScript 的练习题：
+
+[https://github.com/semlinker/awesome-typescript/issues](https://github.com/semlinker/awesome-typescript/issues)
+
+我的 play ground: [链接](https://www.typescriptlang.org/play?#code/PTAEHUFMBsGMHsC2lQBd5oBYoCoE8AHSAZVgCcBLA1UABWgEM8BzM+AVwDsATAGiwoBnUENANQAd0gAjQRVSQAUCEmYKsTKGYUAbpGF4OY0BoadYKdJMoL+gzAzIoz3UNEiPOofEVKVqAHSKymAAmkYI7NCuqGqcANag8ABmIjQUXrFOKBJMggBcISGgoAC0oACCoASMFmgY7p7ehCTkVOle4jUMdRLYTqCc8LEZzCZmoNJODPHFZZXVtZYYkAAeRJTInDQS8po+rf40gnjbDKv8LqD2jpbYoACqAEoAMsK7sUmxkGSCc+VVQQuaTwVb1UBrDYULY7PagbgUZLJH6QbYmJAECjuMigZEMVDsJzCFLNXxtajBbiQWCMAYITiCGj05IUZj5UAAYQcGQY0ncwUUqBaoAAsj9mJAADw4fgPAB8oAAvKAAN6KEoAbQIIi8AApQPFIIZUjhQAAfA1GkkPACUAF12dq1goeMJDcbHqAAPyPLV20COiGrF3cN1Wk3e7x+gODSB6MiKAC+wSFRE53M4vPcStV6qS1Ao8E4ko5QZDwi5DB5fMg-BloAA0mXUaHrqhKJxmHLdSMCpz+O72Q3+DoGNB2JB2TgbeyxWQJSX+CrQBrhBkVw3-QxhAADAAkKobiZ3Du8ibleYlqGlzdd6armZr3d7U5noAA8oh5NL+AByeAFkWv7mqAv5Xr+F7Joo9KMqARJRDQyrMqyeYBABqCFpwuq-gwEq-vwADsNqoehmHYZmyD4aB0DwDRv7ESUaGAVhOHcNwRKCFRy6juOk6gQAGhQDBipwwGJgxoABFeurEYKwpPPoCEHDmqaQCS8HQKgxSAPjmgDY5qACmCEpwqACFugDePoA0eqAPRmgBY-8UaoqCUuF8Zw7CINIPxzIMDDIOyjIdswXkMGxHHsg5YAlCUPETn57ajF5yYqFBKiAO3BgBryoAv4qAA6mJmAEPKWWWSmwq0I4PmCAc0oKsqprOi2wi6gEjWOMwfYZMiOK2kqCpmHgkYPDGnBxp5ql0AAYgAjDmJVkGVFW6hRfH+aMNpdYMbkeWQF4jbQo0AExTaViDlS0krzT5i1xZ2-CRNs7Kue5PwrYqCo6PAFDcFtxWjQAzAdM3IAovynQtsUBddHC3WtD1kE9L1vR9RVpg8nAUJVOY1cGdWVGQM14JKbU-I8Co+v1d1DQm20TZNyrI6jO3jZ9aY7bt+00yjkrMxeclpsQNTfhj5ZtmDoAACK3q2S2dlV3ji7uB4Ex1iYHiLSsqgrBnHpGGoPPwjUBLz0Dfk8-Ai3K-rshqIt2tzKDENToAG9+v4LbwkvMLwCiMlR+EQUAA)
+
+[typescript handbook](https://www.typescriptlang.org/docs/handbook/)

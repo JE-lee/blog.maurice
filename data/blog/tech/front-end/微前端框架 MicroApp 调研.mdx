@@ -1,0 +1,163 @@
+---
+title: 微前端框架 MicroApp 调研
+date: '2023-07-27'
+tags: ['web']
+draft: false
+authors: []
+---
+
+## 微前端的适用场景
+
+首先，微前端肯定不是银弹，并不是万能的，它有其适用的场景，也有不适合的场景。
+
+如果你的产品有下面的需求，那么是可以考虑使用微前端的。
+
+1. 需要组合不同系统的产品，这些独立的产品的服务边界是明确的，没有强交集的。
+2. 前端处于一个不可控的体系中，也就是说系统的各个部分使用的技术栈，开发的团队都是不一样的。
+3. 需要在升级困难的老系统使用新技术栈开发的项目。
+
+虽然微前端的`独立开发`，`独立部署`很吸引人，确实可以降低大团队的协作沟通问题（系统越大，参与人员越多，沟通成本越高）。但是如果只是单纯为了应对大应用的可维护性，而简单粗暴地引入微前端的方式，将系统划分为几个更小的应用（可能根本就无法从业务层面划分），势必会增加系统的复杂性。
+
+## MicroApp 的实现方式和原理
+
+`MicroApp`基于`CustomElement`实现，每个子应用都是在 `<micro-app/>`这个自定义元素中渲染。通过 `CustomElement`的`connectedCallback``disconnectedCallback`等事件来完成对子应用生命周期的管理。
+
+`MicroApp`的样式隔离的实现方式有两种：
+
+1. shadowDom
+2. 拦截 <style/> 标签的创建和插入，对不同子应用的样式文件追加子应用前缀来实现隔离。
+
+`MicroApp`提供两种 JavaScript 沙箱：
+
+1. iframe 沙箱
+2. with 沙箱
+
+`MicroApp`会拦截 <script /> 标签的创建和插入，将子应用的 JavaScript 代码包装一层。这样代码里面访问到的顶层变量如 `window`, `self`,`document`是不同的对象，达到不同子应用之间逻辑的隔离，不会互相污染。
+
+### 大体流程
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="画板"
+    src="https://cdn.nlark.com/yuque/0/2023/jpeg/438262/1686794248420-cd30198c-64df-404f-a039-db730417cc5a.jpeg"
+    fill={true}
+  />
+</div>
+
+### loadSource
+
+1. 使用 `fetch` 加载 html entry 文件，然后对其进行处理，将 `body``head`标签替换成`micro-body``micro-head`(一个 document 里面只能有一个 head 和 body 标签)，同时可以应用 plugins 来自定义对 html entry 进行处理。
+2. 对 `micro-head`中的`link``style``script`进行处理。
+3. 串行加载外联 link 标签的样式，然后对其进行 scopedCss 处理，生成`style`标签插入替换。
+4. 串行加载外联 script 标签的内容，然后用 sandbox 对其进行包装处理，拦截顶层的 window，self，document 访问。
+5. 在 app.onLoad 阶段，执行子应用的 js 代码。
+
+### scoped css
+
+在 scopedCss 函数中，会应用 cssParser 对所有的样式添加前缀 `micro-app [name=xxx]`,并且对于空的 `style`元素进行监听，一旦有新的样式插入，也会执行 scopedCss 。
+
+分为两种情况：
+
+对于子应用初始创建的时候，会依次遍历 head 中的所有 `<link rel="style">`和 `style`元素，然后执行加载样式文件，最后执行 `scopedCss`函数。
+
+另外一种情况是，MicroApp 会拦截动态创建的`link`和`style`元素，对动态插入的样式也会应用 scopedCss。
+
+### execScript
+
+在 app.onLoad 阶段，对 link 和 script 里面的 javascript 代码进行处理。
+
+按照前面阶段处理的顺序，依次加在 link 的外联 javascript 代码或者是直接 runScript 执行内联代码。
+
+在加载 script 文件完成之后，就已经使用 sanbox 对代码进行包装，拦截顶层的 window，self，document 访问。
+
+### keep-alive
+
+如果子应用设置了 `keep-alive`，那么 `<micro-app></micro-app>`标签隐藏的时候，对应的字应用会进入 hidden 状态。
+
+此时子应用的 sandbox 和 dom 树都会被保存起来，等待下一次渲染的时候，直接恢复。
+
+### prefetch
+
+主动调用 microApp.prefetch 可以提前创建子应用，进行 loadSource 。
+
+### 虚拟路由系统
+
+### 如何支持 ESModule
+
+对于 <script type="module"></script> 的脚本，必须使用 `iframe sandbox`。
+
+iframe sandbox 会在主应用页面中插入一个 display: none 的 iframe 标签。当需要执行 type=module 或者 inline script 的时候，就会创建一个 script 标签插入到 iframe 中。在 iframe 中的执行的脚本访问到的顶层变量就是当前 iframe 的 window，也就是当前的 js sandbox。
+
+## MicroApp 的局限
+
+1. 无法处理子应用 vw vh rem
+2. 子应用的媒体查询会有问题，如果子应用只是在局部渲染的话
+3. ~~对 esm 不支持 (使用 iframe 沙箱后，已经可以支持)~~
+4. 子应用是 ESModule 的时候，无法拦截 location 的操作，需要子应用一开始就是用虚拟路由。
+5. 比较成熟的应用都是后台管理系统，缺少其他类型系统的应用。
+6. 更耗内存(几乎是所有微前端的问题)
+
+## 实际应用
+
+1. 主应用设置子应用页面路由，让所有的子应用页面都命中同一个页面组件。
+
+```javascript
+const MICRO_APP_PREFIX = '/ma'
+export const routes = [
+  {
+    path: MICRO_APP_PREFIX,
+    component: () => import('@/layout'),
+    name: 'MicroAppContainerPage',
+    children: [
+      {
+        path: `${MICRO_APP_PREFIX}*`,
+        component: MicroAppPageVue,
+        name: 'MicroAppPage',
+        meta: {
+          title: '',
+        },
+      },
+    ],
+  },
+]
+```
+
+2. 创建子应用的时候，传递额外数据，如登陆鉴权，子应用受限菜单等信息
+
+```vue
+<template>
+  <micro-app
+    keep-alive
+    :name="appName"
+    :url="appFullPath"
+    :baseroute="baseRoute"
+    :data="appData"
+  ></micro-app>
+</template>
+
+<script>
+export default {
+  computed: {
+    appData() {
+      user: {
+        token: store.getters['user/token'],
+      },
+    }
+  }
+}
+</script>
+```
+
+3. 同步主子应用的 Tab 栏信息
+
+Tab 栏一般用来展示用户已经访问过的页面，如果主应用有 Tab 栏的话，还需要处理以下的情况
+
+- 主应用打开某个子应用的页面的时候，需要记录到 Tab。
+- 主应用关闭某个子应用页面的时候，需要通知对应的子应用，让其不要缓存该页面，以节省内存。
+- 如果 Tab 栏中某个子应用的所有页面都已经关闭了，应该销毁该子应用，以节省内存。
+- 子应用内部的页面跳转或者关闭的时候，应该通知给主应用，让主应用决定是否展示在 Tab 栏中，或者在 Tab 栏中删掉对应的子应用页面。
+
+4. 子应用的 401 403 404 的错误信息应交由主应用处理。
+5. 子应用最好不要使用动态路由。是否可以访问子应用的某个页面应该是主应用决定的。

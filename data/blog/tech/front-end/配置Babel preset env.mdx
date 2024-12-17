@@ -1,0 +1,172 @@
+---
+title: 配置 babel preset env
+date: '2019-08-11'
+tags: ['web']
+draft: false
+authors: []
+---
+
+babel的配置可以[写在 package.json](https://babel.bootcss.com/docs/usage/babelrc/#%E9%80%9A%E8%BF%87-packagejson-%E4%BD%BF%E7%94%A8-babelrc)中，如下面
+
+```json
+// .babelrc
+{
+  "babel": {
+    "presets": ["@babel/preset-env", "@babel/preset-stage-2"]
+  }
+}
+```
+
+也可以写在一个.babelrc的JSON配置文件中
+
+```json
+{
+  "presets": ["@babel/preset-env", "@babel/preset-stage-2"]
+}
+```
+
+## @babel/preset-env配置字段
+
+你可以像上面一样直接指定presets为["@babel/preset-env", "@babel/preset-stage-2"],也可以为每一个preset添加配置选项。（使用数组，第一个元素表示preset的名字，第二个元素表示配置项）
+
+```json
+{
+  "presets": [["@babel/preset-env", {}], "@babel/preset-stage-2"]
+}
+```
+
+presets 的编译顺序是**反向**的，因此你应该把"stage-2"放在"env"后面。
+
+### [preset-env.targets](https://babeljs.io/docs/en/babel-preset-env#targets)
+
+```json
+{
+    "presets": [
+        ["@babel/preset-env": {
+            "targets" : "last 2 versions, not dead"
+        }]
+    ]
+}
+
+// 或者直接指定需要兼容的浏览器
+
+{
+    "presets": [
+        ["env": {
+            "targets" : {
+                "chrome": "58",
+                "ie": "11"
+            }
+        }]
+    ]
+}
+
+// 或者是在targets.browsers 中指定
+{
+    "presets": [
+        ["env": {
+            "targets" : {
+                "browsers": "last 2 versions",
+                "esmodules": true, // 指定该选项，将会忽略browserslist, 仅支持那些那些原生支持es6 module的浏览器
+                "safari": true , // 启用safari前沿技术
+                "node": "true" || "current" //兼容当前node版本代码
+            }
+        }]
+    ]
+}
+```
+
+### browserslist
+
+babel使用的浏览器查询是来自于[browserslist](https://github.com/browserslist/browserslist#queries)项目。这个项目同时被很多前端工具库诸如auto-prefixer,postcss使用。最好的指定browserslist的方法是使用一个.browserslistrc 配置文件。它可以被项目中多种工具共享。
+
+```plain
+last 2 vsersions
+not dead
+```
+
+你可以使用
+
+```bash
+npx browserslist
+```
+
+来查看你查看当前项目的browserslisg
+
+或者是在[browserslist online tool ](https://browserl.ist/?q=%3E+0.5%25+in+CN)工具中查看
+
+### [preset-env.modules](https://babeljs.io/docs/en/babel-preset-env#modules)
+
+```plain
+"amd" | "umd" | "systemjs" | "commonjs" | "cjs" | "auto" | false, defaults to "auto"
+```
+
+指定将es6 modules 转换为何种模块规范。
+
+**一般在webpack 项目中，我们会将此参数设置为false,既将module交由webpack处理，而不是babel。**
+
+如果设置为false, 将不转换。**这在node项目中如mocha测试中将不会转换import/export，可能会出错**
+
+### [preset-env.userBuiltIns](https://babeljs.io/docs/en/babel-preset-env#usebuiltins)
+
+```plain
+"usage" | "entry" | false, defaults to false
+This option configures how @babel/preset-env handles polyfills.
+```
+
+"entry": 在入口文件中加入所有的内置类型
+
+如果在.babelrc中指定useBuiltIns: 'entry', 则应该在项目代码的顶部引入babel-polyfill
+
+```plain
+import "@babel/polyfill"
+```
+
+表示全量引入。
+
+"usage": 只在当前文件中加入该文件用到的内置类型的polyfill。
+
+**设置为usage 不需要在顶部引入polyfill**
+
+"false": 不自动加入内置类型的polyfill。
+
+_该特性babel 7 中有效, _[_测试地址_](https://github.com/JE-lee/webpack-useBuiltIns-demo)
+
+### preset-env.useBuiltIns vs @babel/plugin-transform-runtime
+
+#### 使用
+
+```text
+npm install --save-dev @babel/plugin-transform-runtime
+npm install --save @babel/runtime @babel/runtime-corejs2
+
+// .babelrc
+{
+  "plugins": [["@babel/plugin-transform-runtime", {
+               "corejs": 2,
+               "helpers": true
+             }]]
+}
+```
+
+[@babel/plugin-transform-runtime](https://babeljs.io/docs/en/babel-plugin-transform-runtime)这个插件主要做了三件事
+
+- 自动转换generators/async
+
+- 使用core-js来按需给内置类型打上polyfill。(这一点和useBuiltIns:'usage'一样)
+
+- 通过helpers 选项自动移除嵌入的babel helper,并且用module引用来代替。否则每个文件中都会加入这些inline babel helper,造成代码冗余。默认为ture。
+
+@babel/runtime 和 @babel/polyfill 虽然都是为内置类型打上垫片，但是@babel/runtime是在模块内起作用，不会污染全局的Promise,Map...。所以实例的方法不会被polyfill
+
+```javascript
+'123'.padStart()
+```
+
+@babel/plugin-transform-runtime 可以和useBuiltIns一起使用，作用的顺序按照plugins --> presets 的顺序，也就是先使用@babel/plugin-transform-runtime 打上垫片，然后再使用@babel/polyfill 再打上一次垫片。
+
+### 参考
+
+[再见preset-2015](https://zhuanlan.zhihu.com/p/29506685)
+
+[一口气了解Babel](https://mp.weixin.qq.com/s/qetiJo47IyssYWAr455xHQ)

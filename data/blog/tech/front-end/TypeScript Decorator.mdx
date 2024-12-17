@@ -1,0 +1,163 @@
+---
+title: TypeScirpt Decorator
+date: '2021-12-23'
+tags: ['web']
+draft: false
+authors: []
+---
+
+JavaScript 的 decorator 目前（2022.4.1）处于 [stage 2](https://github.com/tc39/proposal-decorators) 。可以被运用在
+
+- Class
+- Class fields
+- Class methods
+- Class accessors
+
+能够给装饰的对象添加新的特性。
+
+在 TypeScript 中， 还支持在 [method parameter](https://www.typescriptlang.org/docs/handbook/decorators.html#parameter-decorators) 中使用 Decorator。
+
+### Class Decorator
+
+接收的参数：
+
+- Class 本身
+
+返回：
+
+如果有返回值，将会替换原来的 Class，需要注意自己处理 prototype 。
+
+```typescript
+function nationality(country: string) {
+  return function (target: any) {
+    console.log('target', target)
+    Reflect.defineMetadata(countryMetaKey, country, target.prototype)
+  }
+}
+```
+
+### Method Decorator
+
+接收的参数：
+
+- 如果是普通方法，该参数是 Class 的 prototype；如果是静态方法，该参数是 Class 本身
+- 属性名（方法名）
+- 属性对应的 Descriptor
+
+```typescript
+function withNationaity(target: any, property: string, descriptor: PropertyDescriptor) {
+  const original = descriptor.value
+  descriptor.value = function (...args: any[]) {
+    const country = Reflect.getMetadata(countryMetaKey, target)
+    const result = original?.apply(this, args) || {}
+    return Object.assign(result, { country })
+  }
+}
+```
+
+### Accessors Decorator
+
+接收的参数：
+
+- 如果是普通方法，该参数是 Class 的 prototype；如果是静态方法，该参数是 Class 本身
+- 属性名（方法名）
+- 属性对应的 Descriptor
+
+**不能同时在同一属性的 get 和 set 上设置，只能单一设置**
+
+---
+
+### Property Decorator
+
+接收的参数：
+
+- 如果是普通方法，该参数是 Class 的 prototype；如果是静态方法，该参数是 Class 本身
+- 属性名（方法名）
+
+### Parameter Decorator
+
+接收的参数：
+
+- 如果是普通方法，该参数是 Class 的 prototype；如果是静态方法，该参数是 Class 本身
+- 属性名（方法名）
+- 参数顺序索引
+
+### Metadata
+
+在 tsconfig.json 中设置 `[emitDecoratorMetadata: true](https://www.typescriptlang.org/tsconfig#emitDecoratorMetadata)`可以让 Typescript 编译的时候附带上一些元信息。
+
+- <font style="color:rgb(163, 21, 21);">design:type 属性的类型</font>
+- <font style="color:rgb(163, 21, 21);">design:paramtypes 函数参数的类型列表, 可以用这个</font>
+- <font style="color:rgb(163, 21, 21);">design:returetype 函数的返回类型</font>
+
+### 依赖注入的实现
+
+```typescript
+import 'reflect-metadata'
+
+class Repository {
+  private deps = new Map<any, any>()
+  bind(target: any, args: any[]) {
+    if (!this.deps.has(target)) {
+      this.deps.set(target, args)
+    }
+  }
+  has(target: any) {
+    return this.deps.has(target)
+  }
+  get(target: any) {
+    if (this.has(target)) {
+      const paramtypes = this.deps.get(target)
+      const args = paramtypes.map((paramtype: any) => this.get(paramtype))
+      return Reflect.construct(target, args)
+    }
+    return null
+  }
+}
+
+const repository = new Repository()
+
+function Injectable(target: any) {
+  const paramtypes = Reflect.getMetadata('design:paramtypes', target)
+  // 注册依赖
+  repository.bind(target, paramtypes || [])
+}
+
+@Injectable
+class UserService {
+  make() {
+    return {
+      firstName: 'lee',
+      lastName: 'bruse',
+    }
+  }
+}
+
+class Controller {
+  type = 'controller'
+}
+
+@Injectable
+class UserController extends Controller {
+  constructor(private userService: UserService) {
+    super()
+  }
+  create() {
+    return this.userService.make()
+  }
+}
+
+const uc = repository.get(UserController)
+console.log(uc instanceof Controller)
+console.log(uc instanceof UserController)
+console.log('new user', uc.create())
+console.log('type', uc.type)
+```
+
+### 参考顺序
+
+[如何基于TypeScript实现控制反转](https://zhuanlan.zhihu.com/p/311184005)
+
+[TypeScript Decorator handbook](https://www.typescriptlang.org/docs/handbook/decorators.html)
+
+[TypeScript Decorator 教程](https://www.bookstack.cn/read/es6-3rd/docs-decorator.md)

@@ -1,0 +1,235 @@
+---
+title: 使用 mocha 测试 TypeScript
+date: '2018-04-03'
+tags: ['web', 'font-end']
+draft: false
+authors: []
+---
+
+## 使用 babel 编译 TypeScript 代码来进行测试
+
+`mocha`是我比较喜欢的一款的单元测试框架。使用mocha直接测试TypeScript文件，需要结合babel，preset-env,preset-typescript以及babel-register，将 ts 代码编译成 js 代码。
+
+```javascript
+// linked-list.ts
+export default class LinkedList(){
+
+}
+// ./test/linked-list.js
+require('@babel/register')({
+    presets: [
+        ['@babel/preset-env', { modules: 'commonjs'}],
+        ['@babel/preset-typescript']
+    ],
+    extensions: ['.ts']
+})
+
+const LinkedList = require('./src/linked-list.ts')
+
+describe('#test', function(){
+    it('#1', function(){
+        let linkedList = new LinkedList()
+        ...
+    })
+})
+```
+
+然后在命令行中执行
+
+```bash
+mocha ./test/linked-list.js
+```
+
+发现报如下错误
+
+`LinkedList is not a constructor`
+
+排查之后发现，在测试文件./test/linked-list.js 中
+
+```javascript
+const LinkedList = require('./src/linked-list.ts')
+```
+
+导入的LinkedList真实为
+
+```javascript
+{ default: function LinkedList(){}, __esModule: true }
+```
+
+所以我应该在测试文件中加上
+
+```javascript
+const LinkedList = require('./src/linked-list.ts').default
+```
+
+才能正确执行。
+
+**但是上面的写法很麻烦，而且很蠢。** 很显然babel将我的ts文件从ES module 转换为 commonjs的时候，是将export default 的内容挂载module.exports.default上面，而不是我一开始期望的 **export default === module.exports =**
+
+## 在 Nuxt/Vue 项目中测试 TypeScript 代码
+
+最近在 Nuxt 项目中使用了 TypeScript，需要对一些关键的模块做单元测试。
+
+1. 安装 `ts-node` ，编写测试用的 npm 脚本
+
+```bash
+yarn add ts-node cross-env mocha
+```
+
+指定 ts-node 编译成 commonjs
+
+```json
+{
+  "test:workflow-canvas": "cross-env TS_NODE_COMPILER_OPTIONS={\\\"module\\\":\\\"commonjs\\\"} mocha -r ts-node/register workflow-canvas/**/*.spec.ts"
+}
+```
+
+2. 复用现有项目中的 tsconfig.json
+
+测试时 ts-node 使用编译配置最好和原来项目中的编译选项保持一致，除了生成 module 不同外，其他最好都一样。所以这里使用 `extends` 来复用相同的配置。
+
+**tsconfig-base.json**
+
+```json
+{
+  "compilerOptions": {
+    "target": "es2018",
+    "moduleResolution": "node",
+    "types": [
+      "node",
+      "@types/node",
+      "@nuxt/types",
+      "@nuxt/vue-app",
+      "@types/webpack-env",
+      "@types/mocha"
+    ]
+  },
+  "include": [
+    "main/**/*.ts",
+    "main/**/*.tsx",
+    "main/**/*.vue",
+    "modules/**/*.ts",
+    "modules/**/*.tsx",
+    "main/nuxt.config.js",
+    "workflow-canvas/**/*.ts",
+    "workflow-canvas/**/*.tsx",
+    "workflow-canvas/**/*.vue"
+  ],
+  "exclude": ["node_modules", "main/config/pont-template-nuxt.ts"]
+}
+```
+
+**项目中使用的 ts-config.json**
+
+```json
+{
+  "extends": "./tsconfig-base",
+  "compilerOptions": {
+    "module": "esnext"
+  }
+}
+```
+
+**测试时使用的 tsconfig-test.json**
+
+```json
+{
+  "extends": "./tsconfig-base",
+  "compilerOptions": {
+    "module": "commonjs"
+  }
+}
+```
+
+3. 由于 tsc 命令行是忽略 `paths` 配置的，所以我们还需要安装 `tsconfig-paths` 来帮助解析 `paths` . [#61](https://github.com/dividab/tsconfig-paths/issues/61)
+4.
+
+```json
+{
+  "test:workflow-canvas": "cross-env TS_NODE_PROJECT=tsconfig.test.json mocha -r tsconfig-paths/register -r ts-node/register ./modules/workflow-manage/workflow-canvas/**/*.spec.ts "
+}
+```
+
+## 延伸
+
+### babel v6之后ES module TO commonjs
+
+在babel v6之后，[export default 导出的内容不再使用module.exports =  导出。](https://github.com/babel/babel/issues/2212)
+
+```javascript
+// es6.js
+export default function sum() {}
+
+// commonjs
+exports.__module = true
+exports['default'] = function sum() {}
+```
+
+`exports.__module`用来告诉打包工具(基本上这是所有打包工具的事实标准)当前模块是从ES module 转换过来的，完全兼容ES module。所以当使用import 导入这样一个commonjs模块的时候，应该使用\_\_importDefault helper来加载
+
+```javascript
+var __importDefault =
+  (this && this.__importDefault) ||
+  function (mod) {
+    return mod && mod.__esModule ? mod : { default: mod }
+  }
+exports.__esModule = true
+var bar_1 = __importDefault(require('bar'))
+```
+
+这也是我们前面必须加上.default的原因。
+
+但是这样子很麻烦，而且很蠢。如果我们还想保持es5 之前的模块交互逻辑，也就是export default导出的内容使用commonjs module.exports = 默认导出。我们可以使用[babel-plugin-add-module-exports](https://www.npmjs.com/package/babel-plugin-add-module-exports)。
+
+```javascript
+require('@babel/register')({
+  presets: [['@babel/preset-env', { modules: 'commonjs' }], ['@babel/preset-typescript']],
+  plugins: ['add-module-exports'],
+  extensions: ['.ts'],
+})
+```
+
+该插件会在当你的模块**只有export default 默认导出**的时候，转换为commonjs的默认导出。
+
+```javascript
+// es6.js
+export default function sum() {}
+
+// commonjs
+exports.__module = true
+exports['default'] = function sum() {}
+modules.exports = exports['default']
+```
+
+这样子我们就不需要加上麻烦的.default了。
+
+### 是否使用默认导出
+
+对于是否使用默认导出(`export default / module.exports =`),好像越来越多的人开始持否定态度。就连javascript 的创造者Nicholas C. Zakas也表示不会[再使用默认导出](https://juejin.im/post/5c4acd646fb9a049b5072f0e)了。要知道npm上大多数的包或者模块都是使用module.exports默认导出的。
+
+那么默认导出到底有什么弊端呢？根据尼古拉斯的说法，默认导出最重要的一个弊端是**会悄无声息地转移到其他变量，无法通过搜索代码的方式来跟踪**。这给代码阅读，排查错误造成了很大的干扰。导出的最佳实践应该是\*\*只使用具名导出
+
+举个例子
+
+```javascript
+// linked-list.js
+export default class LinkedList {}
+
+// a.js
+import list from './linked-list'
+```
+
+在一开始，我们知道list就是LinkedList类。但是随着项目的迭代，我们可能在多处使用了这个LinkedList类，但是我们都想a.js一样改变了这个类名，当我们想通过LinkedList全局搜索何处引用的时候，我们就已经无法得到正确的结果了。每次阅读代码的时候，我们都需要拉到头部看下这个list是从何处导入的，导入的是什么，这会严重中断我们的开发进程。
+
+PS: export default 也是一种具名导出(named export)，只不过这个名字是default.
+
+```javascript
+// a.js
+export default function LinkedList(){}
+
+// b.js
+import { default } from './a.js'
+import LinkedList from './a.js'
+
+// default === LinkedList
+```

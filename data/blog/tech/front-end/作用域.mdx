@@ -1,0 +1,121 @@
+---
+title: JavaScript 作用域
+date: '2020-09-23'
+tags: ['web']
+draft: false
+authors: []
+---
+
+Javascript 把一段代码（包括函数）执行所需的所有信息称为 **执行上下文** 。执行上下文在各个版本中的 ECMAScript 中所表示的信息都不同。
+
+在 ES2018 中有：
+
+1. **lexical environment**：词法环境，当获取变量或者 this 值时使用。
+2. **variable environment**：变量环境，当声明变量时使用。
+3. **code evaluation state**：用于恢复代码执行位置。
+4. **Function**：执行的任务是函数时使用，表示正在被执行的函数。
+5. **ScriptOrModule**：执行的任务是脚本或者模块时使用，表示正在被执行的代码。
+6. **Realm**：使用的基础库和内置对象实例。
+7. **Generator**：仅生成器上下文有这个属性，表示当前生成器。
+
+**作用域** 是执行上下文的一部分，对应于 **lexical environment。**是一套用来确定在何处查找以及如何查找变量的规则。
+
+Javascript 采用的是 **静态作用域** ，也就是说 Javascript 的作用域是根据代码书写位置解析执行时来确定的。
+
+在每一个 **lexical environment **都有 outer reference 用来表示对外部词法环境的引用。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1604114096582-1d950b26-aade-42f2-9566-946cc8fc22bf.png"
+    fill={true}
+  />
+</div>
+
+这就形成了 **作用域链** 。当访问变量 a 时，会在当前的词法环境寻找，如果找不到，则会寻找 outer reference 指向的词法环境，直至顶层词法环境。
+
+## 闭包
+
+```javascript
+function _greet() {
+  const slogan = 'hello'
+  return function (name) {
+    console.log(`${slogan} ${name}`)
+  }
+}
+
+const greet = _greet()
+```
+
+**闭包** 只是一个绑定了词法环境的函数。greet 函数的词法环境大概是这样子的：
+
+**greet lexical** --> **\_greet lexical** --> **global lexical **
+
+它和普通函数的区别是绑定了 **\_greet lexical**。
+
+## 如何查看一个函数的作用域链
+
+在控制台输出一个函数的时候，默认会调用 **toString** 方法输出函数体。要想查看函数对象原本的属性，可以使用 **function.ptototype.constructor。**而函数作用域为 **scope **属性
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1604116240900-dba6545a-bfd2-4f35-8a0b-edae81bbfe0b.png"
+    fill={true}
+  />
+</div>
+
+## with statement
+
+Javascript 中 `with` 语句可以用来**扩展一个语句的作用域链。**
+
+```javascript
+function greet(name) {
+  const slogan = 'hello'
+  const context = { slogan: '你好' }
+  with (context) {
+    console.log(`${slogan} ${name}`)
+  }
+}
+
+greet('javascript') // 你好 javascript
+```
+
+**优势：**
+
+在不影响性能的情况下，优先在指定的对象查找变量，减少变量路径的长度。
+
+**劣势：**
+
+查找指定对象之外的变量会变得很慢，语义不明，无法向前兼容。
+
+**var 语句的声明会穿透 with 语句。**
+
+```javascript
+var b
+void (function () {
+  var env = { b: 1 }
+  b = 2
+  console.log('In function b:', b)
+  with (env) {
+    var b = 3
+    console.log('In with b:', b)
+  }
+})()
+console.log('Global b:', b)
+// In function b: 2
+// In with b: 3
+// Global b: undefined
+```
+
+**在严格模式下不能使用 with 语句。ES6 模块默认启用严格模式。**
+
+## 【参考】
+
+[掘金：从 ECMA 规范解读 JavaScript 全局词法环境](https://juejin.im/post/6873124945040408583)
+
+[极客时间重学前端 作用域](https://time.geekbang.org/column/article/83302)

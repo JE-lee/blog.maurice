@@ -1,0 +1,118 @@
+---
+title: 在 MySql 中使用空间数据类型
+date: '2023-06-12'
+tags: ['web']
+draft: false
+authors: []
+---
+
+MySql 5.7 之后提供了 GIS 数据类型，但是如果想要使用一些地理函数，最好版本还是大于 8.0.
+
+**基本操作：**
+
+```bash
+# 查询
+SELECT ST_asText(coordinate) as coor from space;
+# 插入
+UPDATE space SET coordinate = ST_GeomFromText(POINT(34.5002 113.4533));
+# 计算距离
+SELECT id, name, address, ST_asText(coordinate) as coordinate from acl.space
+where ST_Distance_Sphere(
+  coordinate,
+  ST_GeomFromText('POINT(23.077842362827848 114.39401839894293)', 4326)
+) <= 100000;
+
+
+```
+
+**为列指定 SRID**
+
+```bash
+# GEOMETRY 可以存储任意类型的 spatial 数据.
+CREATE TABLE geom (g GEOMETRY NOT NULL SRID 4326);
+# 查看制定列的 SRID
+SELECT ST_SRID(geometry_column) FROM your_table LIMIT 1;
+```
+
+**SRID** 指定的是 spatial 数据的坐标系。定义了大地水准面，椭球体，大地基准面，经纬度方向等。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2024/png/438262/1710813841996-de2ebd0f-b462-4a58-819a-6fe85edd91f9.png"
+    fill={true}
+  />
+</div>{' '}
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2024/png/438262/1710813832026-3dfd24fd-0617-4636-901a-accbf1226362.png"
+    fill={true}
+  />
+</div>{' '}
+
+MySql 默认的 SRID 为0，表示可以存储任意 SRID 的数据。
+
+常见的 SRID 是 4326，即 84 坐标系。国内其他的高德，火星，百度坐标系都是基于 4236 坐标系，只是做了位置上的偏移。
+
+**4326 坐标系的坐标是 lat/lng 顺序。**
+
+在 MySql 中，可以修改某列数据的 SRID，前提是已有的坐标数据是合法的待转换的 SRID 数据。注意这并不会改变改 Column 的 SRID，只对已有的数据生效。这时候依然不能在该列上创建空间索引。
+
+```bash
+-- Update the new column with the transformed geometries
+UPDATE your_table SET new_geometry_column = ST_SRID(geometry_column, your_srid);
+
+```
+
+也可以通过创建新的 Column 来替换。
+
+```bash
+-- Add a new column with the desired SRID
+ALTER TABLE acl.space ADD COLUMN coor1 POINT SRID 4326;
+
+-- copy the values
+UPDATE acl.space set coor = coordinate;
+
+-- If you want, you can remove the old column
+ALTER TABLE acl.space DROP COLUMN coordinate;
+
+-- And rename the new column to the old one
+ALTER TABLE acl.space CHANGE coor1 coordinate POINT SRID 4326 NOT NULL;
+
+```
+
+**创建空间索引**
+
+只有在指定了 SRID 的列才能创建空间索引, 并且该列是 NOT NULL.
+
+```bash
+CREATE SPATIAL INDEX coor ON acl.space (coordinate);
+```
+
+**TypeOrm 中使用**
+
+```typescript
+@Entity()
+export class Space {
+  @Column({
+    type: 'point',
+    comment: '空间坐标',
+    srid: 4326,
+    transformer: new PointTransformer(),
+  })
+  @Index({ spatial: true })
+  coordinate: string
+}
+```
+
+[数据库中存储空间数据的正确姿势](https://zhuanlan.zhihu.com/p/403983767)
+
+[MySQL空间函数实现位置打卡](https://cloud.tencent.com/developer/article/1684194?areaId=106001)
+
+[Spatial convenience functions](https://dev.mysql.com/doc/refman/8.3/en/spatial-convenience-functions.html)

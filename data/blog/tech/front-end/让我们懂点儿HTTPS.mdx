@@ -1,0 +1,260 @@
+---
+title: 让我们懂点儿HTTPS
+date: '2019-09-23'
+tags: ['web']
+draft: false
+authors: []
+---
+
+通俗点来说，HTTPS就是HTTPS + SSL，即在SSL层（传输安全层）传输HTTP信息。和HTTP不同的是，HTTPS协议是在443端口而不是80端口上传输的。它传输加密的数据，比传输明文的HTTP更安全。
+
+## 非对称加密算法
+
+SSL协议的核心是非对称加密算法。在非对称加密算法中，存在公钥和私钥。由公钥加密的内容，只能由私钥解密，反过来也是如此。但是非对称加密算法对 **加密数据的长度有限制** ，而且加解密对机器的压力比较大。
+
+## 简化的HTTPS请求过程
+
+1. 客户端发送一个HTTPS请求，如https://www.xxx.com/query
+2. 服务端返回由<span className="text-red-700">服务端公钥</span>，<span className="text-red-700">签发机构CA的信息</span>，
+   <span className="text-red-700">服务端的附加信息</span>，以及由
+   <span className="text-red-700">CA私钥加密的签名数据</span>
+   （签名一般是数据的hash值）组成的证书。证书的作用就是用来服务器的信息，类似于身份证。
+   <div className="relative h-[400px]">
+     <Image
+       style={{ objectFit: 'contain' }}
+       className="my-0"
+       alt="fiddler screenshot"
+       src="https://cdn.nlark.com/yuque/0/2020/png/438262/1599141580537-1b97cdaa-e024-4587-843e-4baf4a53a603.png"
+       fill={true}
+     />
+   </div>
+3. 客户端使用预置的 CA 列表检查证书的有效性，即是否属于请求的域名，签发机构是否信任等，同时客户端使用相同的算法生成签名，和由<span className="text-red-700">CA公钥解密出来的签名数据比较</span>，如果不一致，说明证书被篡改过，浏览器会提示用户该连接不安全。
+4. 客户端生成一个随机的对称密钥，使用证书中包含的<span className="text-red-700">服务端公钥</span>加密之后传给服务端。
+5. 服务端使用<span className="text-red-700">私钥</span>解密拿到这个随机的对称密钥。
+6. <span className="text-red-700">之后的通信</span>都使用
+   <span className="text-red-700">对称加密算法</span>
+   进行通信。(因为使用非对称加密算法加密所有的数据对机器的压力太大，所以后续的通信都是用性能比较好的对称加密算法加密数据。)
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583401228213-a58bd5b8-a388-4428-9e65-fe97062e7ae4.png"
+    fill={true}
+  />
+</div>
+
+## 关于CA证书
+
+从HTTPS的请求过程中，我们可以看到，CA证书在其中起到了至关重要的作用。证书的作用之一就是分发服务器的公钥。
+
+证书一般由 **权威的公认的结构签发** 。 **我们申请一个证书的时候，一般需要提供我们服务器的公钥** 。然后CA机构将我们提供的公钥以及其他一些信息，使用CA的公钥进行加密，并且生成一个签名数据（hash）。然后将这些信息放到一个文件里，就生成了一个由当前CA机构签发的证书了。
+
+CA证书是有信用等级的，高层的证书可以给底层的证书做信用背书的。根证书一般都是内置在浏览器或者系统中，相当于自动信任他们。
+
+在chrome --> 隐私设置和安全性 --> 证书管理中，我们可以看下浏览器信任的根证书都有哪些。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583461721487-8cf7082b-a96f-4e57-bd89-631ec811c0bf.png"
+    fill={true}
+  />
+</div>
+
+## 为什么SSL证书需要收费
+
+SSL证书通常来说都是收费的，并且价格还不菲。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583462541282-76324e2f-9280-415b-9931-f47a8da29740.png"
+    fill={true}
+  />
+</div>
+
+那么为什么SSL证书需要收费，而且还这么贵呢？
+
+对于CA厂商来说，显而易见的成本有律师法务审计会用，证书签发系统的研发费用，**CRL、OCSP等服务的日常运维费用等，所以维护SSL证书也是有**[**很大成本**](https://www.zhihu.com/question/340432434/answer/810202344) **的，它不是简单拷贝一个电子文件那么简单。**
+
+[**SSL证书的类型**](https://www.zhihu.com/question/340432434/answer/1020730299) **也有区分，高级别的证书在签发的时候，不仅会验证域名所有权，还会人工审核企业的主体信息。在浏览器中，高级别的证书会显示绿色的地址栏，对于企业来说，这很好的彰显了其品牌力。**
+
+## 使用openssl 生成自签名证书
+
+下面的示例将演示如何在Linux（windows下也可以使用WSL）上使用openssl生成一个自签名的SSL证书。
+
+1. 创建conf 配置文件
+
+```plain
+[ req ]
+
+default_bits        = 2048
+default_keyfile     = server-key.pem
+distinguished_name  = subject
+req_extensions      = req_ext
+x509_extensions     = x509_ext
+string_mask         = utf8only
+
+[ subject ]
+
+countryName                 = Country Name (2 letter code)
+countryName_default         = US
+
+stateOrProvinceName         = State or Province Name (full name)
+stateOrProvinceName_default = NY
+
+localityName                = Locality Name (eg, city)
+localityName_default        = New York
+
+organizationName            = Organization Name (eg, company)
+organizationName_default    = Example, LLC
+
+commonName                  = Common Name (e.g. server FQDN or YOUR name)
+commonName_default          = Example Company
+
+emailAddress                = Email Address
+emailAddress_default        = test@example.com
+
+[ x509_ext ]
+
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid,issuer
+
+basicConstraints       = CA:FALSE
+keyUsage               = digitalSignature, keyEncipherment
+subjectAltName         = @alternate_names
+nsComment              = "OpenSSL Generated Certificate"
+
+[ req_ext ]
+
+subjectKeyIdentifier = hash
+
+basicConstraints     = CA:FALSE
+keyUsage             = digitalSignature, keyEncipherment
+subjectAltName       = @alternate_names
+nsComment            = "OpenSSL Generated Certificate"
+
+[ alternate_names ]
+
+DNS.1       = example.com
+```
+
+2. 生成服务器私钥和证书请求文件。
+
+```shell
+openssl req -config example.conf -new -sha256 -newkey rsa:2048 \
+-nodes -keyout example.com.key -x509 -days 365 \
+-out example.com.crt
+```
+
+## 使用node部署一个HTTPS站点
+
+接下来我们使用node，用上面生成的私钥和证书文件来部署一个HTTPS站点。
+
+3. 启动node站点
+
+```javascript
+//根据项目的路径导入生成的证书文件
+var privateKey = fs.readFileSync(path.join(__dirname, './spaas.key'), 'utf8')
+var certificate = fs.readFileSync(path.join(__dirname, './spaas.crt'), 'utf8')
+var credentials = { key: privateKey, cert: certificate }
+
+//创建HTTPS服务器
+var httpsServer = https.createServer(credentials, function (req, res) {
+  res.status(200).send('hello https').end()
+})
+httpsServer.listen(8001)
+```
+
+此时如果访问https://localhost:8001，浏览器会提示privacy error。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583483384164-4b92161f-9c5d-4ee5-a422-e4bfde31adfa.png"
+    fill={true}
+  />
+</div>
+
+出现<span className="text-red-700">ERR_COMMON_NAME_INVALID</span>这个错误，是因为我们服务器使用的证书是颁发给example.com的（上面的conf文件中最后一句）， 和当前的域名localhost不匹配。
+
+修改系统HOST文件，将example.com 指向127.0.0.1
+
+```plain
+127.0.0.1       example.com
+```
+
+此时再次访问https://example.com:8001, 浏览器依然提示privacy error。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583483736848-a34589cc-ab3f-4554-a772-1d62ea99584b.png"
+    fill={true}
+  />
+</div>
+
+但是另外的错误<span className="text-red-700">ERR_CERT_AUTHORITY_INVALID 。</span>
+出现这个错误的原因是因为这个证书是我们自己签发的，它并不被浏览器和系统信任。接下来我们将它安装到系统的
+
+<span className="text-red-700">受信任的根证书颁发机构</span>
+
+在控制台中打开security, 然后选择View certificate， 将证书文件导出，之后双击安装。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583483906547-1755d174-8958-4eef-90ad-98f6a1c92151.png"
+    fill={true}
+  />
+</div>
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="fiddler screenshot"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583484016937-31a43f4c-7046-40ba-96f4-f86afeca37b3.png"
+    fill={true}
+  />
+</div>
+
+安装成功后，重新请求https://example.com:8001, （<span className="text-red-700">可能需要重新启动浏览器</span>）,就显示我们的连接是安全的了。
+
+[该节内容参考了这篇文章](https://deliciousbrains.com/https-locally-without-browser-privacy-errors/)
+
+## 弄一个私人的证书签发机构
+
+之前我们说过证书也是有层级的，高层的证书可以给低层的证书做信用背书。也就是说，如果系统已经信任了一个我们自签的证书，那么由这个证书颁发的子证书都会被信任。
+
+[待看这篇文章](https://segmentfault.com/a/1190000019425802)
+
+[how to create a tiny CA](https://deliciousbrains.com/ssl-certificate-authority-for-local-https-development/)
+
+## 申请免费的SSL证书
+
+## [https://certbot.eff.org/lets-encrypt/ubuntubionic-other](https://certbot.eff.org/lets-encrypt/ubuntubionic-other)
+
+[https://www.jianshu.com/p/4220bdbda0e1](https://www.jianshu.com/p/4220bdbda0e1)
+
+## HTTPS 攻击
+
+1. [协议降级攻击原里](https://zhuanlan.zhihu.com/p/22917510)
+
+## 参考
+
+[一个故事讲完HTTPS](https://mp.weixin.qq.com/s/StqqafHePlBkWAPQZg3NrA)
+
+[深入理解HTTPS](https://klionsec.github.io/2017/07/31/https-learn/)
