@@ -68,4 +68,4 @@ async function commit() {
 }
 
 await subsetFont()
-await commit()
+// await commit()
