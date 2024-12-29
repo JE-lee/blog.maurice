@@ -10,7 +10,8 @@
     "analyze": "cross-env ANALYZE=true next build",
     "lint": "next lint --fix --dir pages --dir app --dir components --dir lib --dir layouts --dir scripts",
     "prepare": "husky",
-    "fontsubset": "npx zx scripts/fontsubset/fontsubset.mjs"
+    "fontsubset": "npx zx scripts/fontsubset/fontsubset.mjs",
+    "obsidian-sync": "npx zx scripts/obsidian-sync.mjs"
   },
   "dependencies": {
     "@headlessui/react": "1.7.19",
@@ -24,7 +25,6 @@
     "github-slugger": "^2.0.0",
     "gray-matter": "^4.0.2",
     "hast-util-from-html-isomorphic": "^2.0.0",
-    "image-size": "1.0.0",
     "next": "14.2.3",
     "next-contentlayer2": "0.5.1",
     "next-themes": "^0.3.0",
@@ -59,6 +59,7 @@
     "eslint-plugin-prettier": "^5.0.0",
     "fontmin": "^1.1.0",
     "husky": "^9.0.0",
+    "image-size": "1.0.0",
     "lint-staged": "^13.0.0",
     "prettier": "^3.0.0",
     "prettier-plugin-tailwindcss": "^0.5.11",
