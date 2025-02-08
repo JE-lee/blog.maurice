@@ -1,11 +1,16 @@
 #!/usr/bin/env zx
 import { fs, path, glob } from 'zx'
 import sizeOf from 'image-size'
+import { generateTags } from './generate-tag.mjs'
+import { generateSummary } from './generate-summary.mjs'
+import { configDotenv } from 'dotenv'
+
+configDotenv({ path: path.resolve(import.meta.dirname, '../../.env.local') })
 
 const OBSIDIAN_VAULT = '/Users/wuliheng/Documents/obsidian'
 const OBSIDIAN_BLOG_DIR = path.resolve(OBSIDIAN_VAULT, 'blog')
-const BLOG_DIR = path.resolve(import.meta.dirname, '../data/blog')
-const IMG_DIR = path.resolve(import.meta.dirname, '../public/static/images/blog') // 所有图片都放在这里
+const BLOG_DIR = path.resolve(import.meta.dirname, '../../data/blog')
+const IMG_DIR = path.resolve(import.meta.dirname, '../../public/static/images/blog') // 所有图片都放在这里
 
 const obsidianBlogs = await glob('**/*.md', { cwd: OBSIDIAN_BLOG_DIR, absolute: true })
 for (const blog of obsidianBlogs) {
@@ -14,7 +19,9 @@ for (const blog of obsidianBlogs) {
 
 async function copyBlog(blog) {
   let raw = await fs.readFile(blog, 'utf8')
-  raw = await transformImages(raw)
+
+  raw = await maybeAddFrontmatter(raw, blog)
+  raw = await convertObsidianImages(raw)
   let relativeObsidianPath = path.relative(OBSIDIAN_BLOG_DIR, blog)
   // change the extension to .mdx
   relativeObsidianPath = path.join(
@@ -27,7 +34,7 @@ async function copyBlog(blog) {
   await fs.writeFile(dest, raw, { encoding: 'utf8' })
 }
 
-async function transformImages(raw) {
+async function convertObsidianImages(raw) {
   const reg = /!\[\[(.*)\]\]/g
   let obsidianImage
   while ((obsidianImage = reg.exec(raw))) {
@@ -59,7 +66,7 @@ function insertToRaw(raw, insertion, index) {
 }
 
 async function generateNextImage(image) {
-  let src = path.relative(path.resolve(import.meta.dirname, '../public'), image)
+  let src = path.relative(path.resolve(import.meta.dirname, '../../public'), image)
   src = path.join('/', src)
 
   const { width, height } = await getImageSize(image)
@@ -87,4 +94,25 @@ function getImageSize(image) {
       }
     })
   })
+}
+
+async function maybeAddFrontmatter(raw, blogPath) {
+  if (raw.startsWith('---')) {
+    return raw
+  }
+
+  const tags = await generateTags(raw)
+  const summary = await generateSummary(raw)
+  const frontmatter = `---
+title: ${path.basename(blogPath, path.extname(blogPath))}
+date: ${new Date().toISOString().split('T')[0]}
+lastmod: ${new Date().toISOString().split('T')[0]}
+tags: ${JSON.stringify(tags)}
+summary: ${JSON.stringify(summary)}
+draft: false
+images: []
+---
+`
+  raw = frontmatter + raw
+  return raw
 }

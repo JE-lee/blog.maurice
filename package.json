@@ -11,7 +11,7 @@
     "lint": "next lint --fix --dir pages --dir app --dir components --dir lib --dir layouts --dir scripts",
     "prepare": "husky",
     "fontsubset": "npx zx scripts/fontsubset/fontsubset.mjs",
-    "obsidian-sync": "npx zx scripts/obsidian-sync.mjs"
+    "obsidian-sync": "npx zx scripts/obsidian-sync/index.mjs"
   },
   "dependencies": {
     "@headlessui/react": "1.7.19",
@@ -47,12 +47,15 @@
     "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {
+    "@langchain/core": "^0.3.39",
+    "@langchain/openai": "^0.4.3",
     "@svgr/webpack": "^8.0.1",
     "@types/mdx": "^2.0.12",
     "@types/react": "^18.2.73",
     "@typescript-eslint/eslint-plugin": "^6.1.0",
     "@typescript-eslint/parser": "^6.1.0",
     "cross-env": "^7.0.3",
+    "dotenv": "^16.4.7",
     "eslint": "^8.45.0",
     "eslint-config-next": "14.2.3",
     "eslint-config-prettier": "^8.8.0",
