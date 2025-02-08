@@ -17,6 +17,10 @@ export default async function Page() {
           <h1 className="text-3xl font-extrabold leading-9 tracking-tight text-gray-900 dark:text-gray-100 sm:text-4xl sm:leading-10 md:border-r-2 md:px-6 md:text-6xl md:leading-14">
             Tags
           </h1>
+          <div className="text-center">
+            <i className="svg-icon i-spark"></i>
+            <span className="font-bold"> 由 AI 生成</span>
+          </div>
         </div>
         <div className="flex max-w-lg flex-wrap">
           {tagKeys.length === 0 && 'No tags found.'}
