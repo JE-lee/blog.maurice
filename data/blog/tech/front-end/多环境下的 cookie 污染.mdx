@@ -1,9 +1,13 @@
 ---
 title: 多环境下的 cookie 污染
-date: '2018-06-24'
-tags: ['web']
+date: 2018-06-24
+tags:
+  - 前端安全
+  - 工程化
+  - 调试技巧
 draft: false
 authors: []
+summary: 在多环境网站中，cookie 的 `domain` 和 `path` 设置不当可能导致信息污染，需谨慎处理以避免问题。
 ---
 
 设置 cookie 的时候可以指定 `domain` 域名作用范围， `path` 文档作用范围， `expires` 过期时间等。

@@ -1,9 +1,14 @@
 ---
 title: 跨域 iframe Cookie 设置
-date: '2022-09-15'
-tags: ['web']
+date: 2022-09-15
+tags:
+  - 前端安全
+  - 跨平台开发
+  - 新技术趋势
 draft: false
 authors: []
+summary: 在跨域 iframe 中设置 Cookie 时，Chrome 80+ 默认的 SameSite=Lax 导致无法写入，需使用
+  SameSite=None;secure=true 或新特性 SameParty 解决。
 ---
 
 我需要在当前项目站点 `http://oms.company.com` 中嵌入报表系统的网页 `https://data.company2.com`。

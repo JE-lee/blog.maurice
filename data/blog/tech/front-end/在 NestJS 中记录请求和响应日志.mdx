@@ -1,9 +1,13 @@
 ---
 title: 在 Nest.js 中记录请求和响应日志
-date: '2023-11-23'
-tags: ['web']
+date: 2023-11-23
+tags:
+  - Node.js
+  - 前端性能优化
+  - 工程化
 draft: false
 authors: []
+summary: 在 Nest.js 中，通过 Middleware 记录请求日志，Interceptor 和 Exception Filter 记录响应日志，确保全面监控。
 ---
 
 从下面的 NestJS 的各个切面执行顺序可知，对于请求的 log 可以在 `Middleware`中记录，而对于响应的 log 则可以在 `Interceptor`和 `Exception Filter`中记录。
