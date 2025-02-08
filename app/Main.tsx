@@ -49,8 +49,14 @@ export default function Home({ posts }) {
                             ))}
                           </div> */}
                         </div>
-                        <div className="prose max-w-none text-gray-500 dark:text-gray-400">
-                          {summary}
+                        <div className="px-4 py-2">
+                          <div>
+                            <i className="svg-icon i-spark"></i>
+                            <span className="font-bold">AI 生成的摘要</span>
+                          </div>
+                          <div className="prose max-w-none text-gray-500 dark:text-gray-400">
+                            {summary}
+                          </div>
                         </div>
                       </div>
                       <div className="text-base font-medium leading-6">
