@@ -20,7 +20,7 @@ async function generateSummary(content) {
   })
   const model = new ChatOpenAI({
     temperature: 0.3,
-    model: 'moonshot-v1-auto',
+    model: process.env.OPENAI_MODEL,
   })
   const chain = prompt.pipe(model)
   const response = await chain.invoke({ content })
