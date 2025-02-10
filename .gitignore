@@ -45,3 +45,7 @@ yarn-error.log*
 
 # Contentlayer
 .contentlayer
+
+app/xai-wu-wen-kai-screen-subset.woff2
+scripts/fontsubset/unique-chars.txt
+app/tag-data.json
