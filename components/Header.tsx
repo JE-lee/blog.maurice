@@ -46,6 +46,9 @@ const Header = () => {
         </div>
         <SearchButton />
         <ThemeSwitch />
+        <Link href="./feed.xml" target="_blank">
+          <i className="svg-icon i-rss"></i>
+        </Link>
         <MobileNav />
       </div>
     </header>
