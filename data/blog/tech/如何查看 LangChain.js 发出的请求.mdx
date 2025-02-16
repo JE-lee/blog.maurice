@@ -1,0 +1,82 @@
+---
+title: 如何查看 LangChain.js 发出的请求
+date: 2025-02-16
+lastmod: 2025-02-16
+tags: ['LangChain']
+summary: '为了调试 LangChain 请求信息，可以设置 `DEBUG=true` 查看请求，或使用自定义 fetch 拦截请求与响应，也可通过代理工具监测 HTTP 信息。'
+draft: false
+images: []
+---
+
+出于调试的需要，有时候需要查看 LangChain 底层发出的请求信息。
+
+## DEBUG
+
+`@langchain/openai` 使用了 `openai` 包与 LLM 进行交互。如果设置了环境变量 `DEBUG=true`，`openai` 会[自动打印](https://github.com/openai/openai-node?tab=readme-ov-file#logging-and-middleware)所有的 http 请求情况。
+
+## Custom Fetch
+
+`openai` 可以接收一个自定义的 fetch，我们可以在这个自定义的 fetch 进行 request 和 response 的拦截。
+
+```typescript
+import { fetch } from 'undici' // as one example
+import OpenAI from 'openai'
+
+const client = new OpenAI({
+  fetch: async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
+    console.log('About to make a request', url, init)
+    const response = await fetch(url, init)
+    console.log('Got response', response)
+    return response
+  },
+})
+```
+
+而 `@langchain/openai` 保留了个参数，用来透传 `openai` 的初始化参数。
+
+```typescript
+const model = new ChatOpenAI({
+  temperature: 0.8,
+  model: 'gpt-4o-mini',
+  verbose: true,
+  fetch: async () => {},
+})
+```
+
+## HTTP monitor
+
+上述两种方式都是在终端打印日志的形式来输出 http 信息，我们也可以使用 Charles, ProxyMan 等一些代理工具来监测 http 信息。
+
+1. 设置代理工具和安装必要的 SSL 证书
+2. 设置 `@langchain/openai` 的 proxy agent.
+
+```typescript
+import { HttpsProxyAgent } from 'https-proxy-agent'
+const model = new ChatOpenAI({
+  temperature: 0.8,
+  model: 'gpt-4o-mini',
+  verbose: true,
+  configuration: {
+    httpAgent: new HttpsProxyAgent('http://10.68.246.203:9091'),
+  },
+})
+```
+
+之后就可以通过 network panel 来查看 http 请求信息了
+
+<div className="flex justify-center">
+  <Image
+    alt="courier-new-fallback-font"
+    src="/static/images/blog/proxyman network panel.png"
+    width={1792}
+    height={1014}
+  />
+</div>
+
+Node 默认并不支持自签发的证书，可以通过设置环境变量 `NODE_TLS_REJECT_UNAUTHORIZED=0` 来改变这一行为。
+
+---
+
+默认情况下，macOS 的 **“网页代理（HTTP Proxy）”** 只会影响通过 **系统 API（如 Safari、Chrome、Edge 等浏览器）** 发送的 HTTP 请求。
+
+通过 `HTTP_PROXY`， `HTTPS_PROXY` 方式指定的代理，也不会自动影响到 Node 发送（如 http.get, fetch）的 HTTP 请求。
