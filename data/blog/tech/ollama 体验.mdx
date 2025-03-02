@@ -1,0 +1,121 @@
+---
+title: ollama 体验
+date: 2025-03-02
+lastmod: 2025-03-02
+tags: ['新技术趋势', 'AI 应用', '开发环境']
+summary: '在 Ubuntu 24.04 上安装 Ollama，配置 AMD GPU，创建服务并运行大模型，确保 ROCm 驱动正常。'
+draft: false
+images: []
+---
+
+在 ubuntu 24.04 上安装 ollama， 运行本地大模型。
+
+机器参数：
+AMD Ryzen™ 5 PRO 4650U with Radeon™ Graphics × 12
+16 GB memory
+ubuntu 24.04
+
+#### **1. 手动下载 Ollama**
+
+目前 ollama 最新版本是 0.5.12
+
+```bash
+curl -o ollama-linux-amd64.tgz "https://github.com/ollama/ollama/releases/download/v0.5.12/ollama-linux-amd64.tgz"
+```
+
+我的机器支持 AMD GPU（ROCm），还需要额外下载：
+
+```bash
+curl -o ollama-linux-amd64-rocm.tgz "https://github.com/ollama/ollama/releases/download/v0.5.12/ollama-linux-amd64-rocm.tgz"
+```
+
+#### **2. 解压并安装 Ollama**
+
+选择安装目录，通常是 `/usr/local/lib/ollama`：
+
+```bash
+sudo mkdir -p /usr/local/lib/ollama
+sudo tar -xzf ollama-linux-amd64.tgz -C /usr/local/lib/ollama
+sudo tar -xzf ollama-linux-amd64-rocm.tgz -C /usr/local/lib/ollama
+```
+
+#### **3. 创建 Ollama 可执行文件的符号链接**
+
+```bash
+sudo ln -sf /usr/local/lib/ollama/bin/ollama /usr/local/bin/ollama
+```
+
+#### **4. 配置 systemd 服务**
+
+创建 `ollama` 运行用户：
+
+```bash
+sudo useradd -r -s /bin/false -U -m -d /usr/share/ollama ollama
+# 确保 Ollama 服务能够访问必要的硬件资源（如 GPU）
+sudo usermod -a -G render ollama
+sudo usermod -a -G video ollama
+# 将当前用户加入 ollama 用户组
+sudo usermod -a -G ollama $(whoami)
+```
+
+创建 systemd 服务文件：
+
+```bash
+sudo tee /etc/systemd/system/ollama.service > /dev/null <<EOF
+[Unit]
+Description=Ollama Service
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/ollama serve
+User=ollama
+Group=ollama
+Restart=always
+RestartSec=3
+Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+
+[Install]
+WantedBy=default.target
+EOF
+```
+
+启用并启动 Ollama 服务：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable ollama
+sudo systemctl start ollama
+```
+
+#### **5. 确保 AMD ROCm 运行（如果使用 GPU）**
+
+确保 ROCm 驱动已安装：
+
+```bash
+sudo apt install -y rocm-dev
+```
+
+然后检查 AMD GPU 是否被识别：
+
+```bash
+rocminfo
+# 应该能看到 name: gfxxx 之类的信息。
+```
+
+如果一切正常，Ollama 就可以使用 GPU 进行推理了。
+
+#### **6.拉取模型和启动**
+
+```bash
+ollama pull deepseek-r1:1.5b
+ollama run deepseek-r1:1.5b
+```
+
+<div className="flex justify-center">
+  <Image
+    alt="courier-new-fallback-font"
+    src="/static/images/blog/ollama run deepseekr1-1.5b.png"
+    width={1030}
+    height={348}
+  />
+</div>
