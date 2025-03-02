@@ -4,6 +4,8 @@ import sizeOf from 'image-size'
 import { generateTags } from './generate-tag.mjs'
 import { generateSummary } from './generate-summary.mjs'
 import { configDotenv } from 'dotenv'
+import yaml from 'yaml'
+import prettier from 'prettier'
 
 configDotenv({ path: path.resolve(import.meta.dirname, '../../.env.local') })
 
@@ -19,19 +21,23 @@ for (const blog of obsidianBlogs) {
 
 async function copyBlog(blog) {
   let raw = await fs.readFile(blog, 'utf8')
-
   raw = await maybeAddFrontmatter(raw, blog)
   raw = await convertObsidianImages(raw)
+
+  const dest = getBlogDest(blog)
+  await fs.ensureDir(path.dirname(dest))
+  raw = await prettier.format(raw, { parser: 'markdown' })
+  await fs.writeFile(dest, raw, { encoding: 'utf8' })
+}
+
+function getBlogDest(blog) {
   let relativeObsidianPath = path.relative(OBSIDIAN_BLOG_DIR, blog)
   // change the extension to .mdx
   relativeObsidianPath = path.join(
     path.dirname(relativeObsidianPath),
     path.basename(relativeObsidianPath, path.extname(relativeObsidianPath)) + '.mdx'
   )
-
-  const dest = path.resolve(BLOG_DIR, relativeObsidianPath)
-  await fs.ensureDir(path.dirname(dest))
-  await fs.writeFile(dest, raw, { encoding: 'utf8' })
+  return path.resolve(BLOG_DIR, relativeObsidianPath)
 }
 
 async function convertObsidianImages(raw) {
@@ -97,22 +103,55 @@ function getImageSize(image) {
 }
 
 async function maybeAddFrontmatter(raw, blogPath) {
-  if (raw.startsWith('---')) {
-    return raw
+  const { content: withoutFrontMatter } = extractFrontmatter(raw)
+  raw = withoutFrontMatter
+
+  const destFile = getBlogDest(blogPath)
+  const { frontmatter: destFileFrontMatter } = extractFrontmatter(
+    await fs.readFile(destFile, 'utf8')
+  )
+
+  const fsStat = await fs.stat(blogPath)
+  const lastmod = fsStat.mtime.toISOString()
+  console.log('lastmod:', lastmod, destFileFrontMatter.lastmod)
+  // no change
+  if (destFileFrontMatter.lastmod && new Date(destFileFrontMatter.lastmod) >= fsStat.mtime) {
+    return (
+      `---
+${yaml.stringify(destFileFrontMatter)}
+---
+` + raw
+    )
   }
 
   const tags = await generateTags(raw)
   const summary = await generateSummary(raw)
-  const frontmatter = `---
-title: ${path.basename(blogPath, path.extname(blogPath))}
-date: ${new Date().toISOString().split('T')[0]}
-lastmod: ${new Date().toISOString().split('T')[0]}
-tags: ${JSON.stringify(tags)}
-summary: ${JSON.stringify(summary)}
-draft: false
-images: []
+  const frontmatter = {
+    title: path.basename(blogPath, path.extname(blogPath)),
+    date: fsStat.birthtime.toISOString().split('T')[0],
+    lastmod: lastmod,
+    tags: tags,
+    summary: summary,
+    draft: false,
+    images: [],
+  }
+  raw =
+    `---
+${yaml.stringify(frontmatter)}
 ---
-`
-  raw = frontmatter + raw
+` + raw
+
   return raw
+}
+
+function extractFrontmatter(raw) {
+  const frontmatterContent = raw.match(/^---\n([\s\S]*?)\n---/)?.[1]
+  if (!frontmatterContent) {
+    return { frontmatter: null, content: raw }
+  }
+  const frontmatter = yaml.parse(frontmatterContent)
+  return {
+    frontmatter,
+    content: raw.substring(frontmatterContent.length + 8),
+  }
 }
