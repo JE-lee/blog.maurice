@@ -107,21 +107,23 @@ async function maybeAddFrontmatter(raw, blogPath) {
   raw = withoutFrontMatter
 
   const destFile = getBlogDest(blogPath)
-  const { frontmatter: destFileFrontMatter } = extractFrontmatter(
-    await fs.readFile(destFile, 'utf8')
-  )
-
   const fsStat = await fs.stat(blogPath)
   const lastmod = fsStat.mtime.toISOString()
-  console.log('lastmod:', lastmod, destFileFrontMatter.lastmod)
-  // no change
-  if (destFileFrontMatter.lastmod && new Date(destFileFrontMatter.lastmod) >= fsStat.mtime) {
-    return (
-      `---
+
+  if (await fs.exists(destFile)) {
+    const { frontmatter: destFileFrontMatter } = extractFrontmatter(
+      await fs.readFile(destFile, 'utf8')
+    )
+
+    // no change
+    if (destFileFrontMatter.lastmod && new Date(destFileFrontMatter.lastmod) >= fsStat.mtime) {
+      return (
+        `---
 ${yaml.stringify(destFileFrontMatter)}
 ---
 ` + raw
-    )
+      )
+    }
   }
 
   const tags = await generateTags(raw)
