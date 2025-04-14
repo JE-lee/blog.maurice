@@ -1,0 +1,115 @@
+---
+title: 使用 Nginx Proxy
+date: 2025-04-14
+lastmod: 2025-04-14T12:18:03.428Z
+tags:
+  - Node.js
+  - 前端安全
+  - 工程化
+summary: 本文介绍了如何使用nginx反向代理处理302重定向，包括启动目标服务器、配置nginx和使用njs模块的步骤。
+draft: false
+images: []
+---
+
+如何使用 nginx 反向代理，并处理 302 重定向
+
+[源码](https://github.com/JE-lee/nginx-proxy)
+
+## proxy_pass + error_page + internal block
+
+1.启动目标服务器
+
+提供 '/redirect-to-github' 接口
+该接口返回 302 重定向到 https://github.com
+
+```bash
+
+node server.js
+
+```
+
+2.启动 nginx
+
+```bash
+
+docker run --rm -it -p 8888:80 -v $(pwd)/nginx.conf:/etc/nginx/nginx.conf:ro nginx
+
+```
+
+3.访问 'http://localhost:8888/proxy?url=http://host.docker.internal:7777/redirect-to-baidu'
+
+## njs module
+
+1. 启动目标服务器
+
+提供 '/redirect-to-baidu' 接口
+
+该接口返回 302 重定向到 https://www.baidu.com
+
+```bash
+
+node server.js
+
+```
+
+2. 启动 nginx
+
+```bash
+
+docker run -it --rm --name nginx-njs -v $(pwd)/nginx-njs.conf:/etc/nginx/nginx.conf -v $(pwd)/http.js:/etc/nginx/http.js -p 8888:80 nginx:latest
+
+```
+
+3. 访问 'http://localhost:8888/proxy?url=http://host.docker.internal:7777/redirect-to-baidu'
+
+在 njs 中使用 `ngx.fetch` 请求 https 地址的时候，需要预先[提供可信任的 CA 证书](https://nginx.org/en/docs/http/ngx_http_js_module.html#js_fetch_trusted_certificate)
+
+```bash
+
+location /proxy {
+
+js_content http.handle_proxy;
+
+js_fetch_trusted_certificate /etc/ssl/certs/GlobalSign_Root_CA.pem; # www.baidu.com 所使用的根证书
+
+add_header Access-Control-Allow-Origin *;
+
+}
+
+```
+
+如上，我们需要 `ngx.fetch` https://www.baidu.com，那么我们就指定该域名的根证书为受信任。
+
+也可以指定所有的系统的系统根证书
+
+```bash
+
+location /proxy {
+
+js_content http.handle_proxy;
+
+js_fetch_trusted_certificate /etc/ssl/certs/ca-certificates.crt; # 系统根证书
+
+add_header Access-Control-Allow-Origin *;
+
+}
+
+```
+
+但是这样会导致性能问题，最好的做法是只信任我们需要的证书。pem 文件里面可以包含多个证书，nginx 会自动处理。
+
+或者是[禁用](https://nginx.org/en/docs/http/ngx_http_js_module.html#js_fetch_verify) fetch ssl verification (不推荐，仅调试用)
+
+```nginx.conf
+
+location /proxy {
+
+js_content http.handle_proxy;
+
+js_fetch_verify off;
+
+add_header Access-Control-Allow-Origin *;
+
+}
+
+```
