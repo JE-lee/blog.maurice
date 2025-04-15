@@ -1,0 +1,449 @@
+---
+title: Docker 备忘
+date: 2023-08-11
+lastmod: 2023-08-11T07:39:09.889Z
+tags:
+  - 开发环境
+  - 容器技术
+summary: docker 学习笔记
+draft: false
+images: []
+---
+
+```bash
+# 启动 docker 服务
+sudo service docker start
+# 交互方式启动
+docker run -it ubuntu bash
+# 后台服务模式启动
+docker run -d ubuntu bash -c "while true; do echo hello world;
+sleep 1; done"
+# 映射端口和数据卷
+docker run --name mongo --port 2234:80 -v /tmp/data:/data/db
+# 进入处于后台模式的容器
+docker exec -it [container id] /bin/bash
+# 查看某个命令的用法
+docker --help
+docker [command] --help
+# 查看输出
+docker logs containerid
+
+# 删除容器
+docker rm -f containerid
+# 查看容器的端口信息
+docker port containerid
+
+# 查看容器网络信息
+docker network inspect bridge
+```
+
+## 国内镜像源
+
+使用 docker 国内的官方源 [https://registry.docker-cn.com](https://registry.docker-cn.com)
+
+或者是网易的镜像源[http://hub-mirror.c.163.com](http://hub-mirror.c.163.com)
+
+网易的源会快一点。
+
+```bash
+cd ~/.docker
+vim daemon.json
+{
+  "experimental" : false,
+  "debug" : true,
+  "registry-mirrors": ["https://registry.docker-cn.com"]
+
+}
+```
+
+## Docker run
+
+### 设置环境变量
+
+```bash
+docker run -e NODE_ENV=prod node index.js
+docker run --env-file .env node index.js
+```
+
+### 重启
+
+```bash
+docker run --restart=on-failure node index.js
+```
+
+###
+
+## docker commit
+
+如果一个容器内的文件有改动需要生成新的镜像就可以使用 `docker commit` 。
+
+```bash
+# 为 ubuntu 镜像添加 curl 工具
+docker run -it ubuntu bash
+# 在容器内
+apt-get update
+apt install net-tools
+aput install curl
+
+# 在宿主机的终端提交
+docker commit [container id] ubuntu_nettools_curl
+```
+
+##
+
+## docker 限制容器的 cpu 和内存
+
+## tag 概念
+
+## 多阶段构建
+
+什么情况下会生成中间镜像
+
+## 容器网络连接
+
+### none 模式
+
+容器没有网卡，ip，路由等信息，需要自行配置。这种方式网络隔离最彻底。
+
+### host 模式
+
+docker 容器使用宿主机的 ip 和端口，但是文件系统还是隔离的，最大好处就是性能。
+
+```bash
+docker run --network host nginx
+docker run --network host ubuntu
+# 在 ubuntu 容器里面可以这样访问 nginx
+curl http://localhost:80
+```
+
+**注意**：mac 版本的 docker host 模式有点不一样，以上在 ubuntu docker 测试通过。
+
+### bridge 模式
+
+docker 启动后创建一个虚拟网桥 docker0，宿主机和容器都连接到这个网桥上面，并且都分配了处于该子网段的 ip，通过这种方式，不同容器之间，容器和宿主机器之间可以通过子网段 ip 地址互联。docker 默认为桥接模式，可以将容器和宿主机都想象成连接到同一网关的不同机器。
+
+docker 默认的网络模式就是 bridge 模式。虽然它比 host 模式更复杂，但是也更安全。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="docker bridge mode"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1598794931633-e13dedbf-d286-4be5-8ab5-4bd0ca7704c9.png"
+    fill={true}
+  />
+</div>
+
+如下图，在 ubuntu 中，宿主机有两个不同的网卡，eth0 是主机内网 ip 地址，而主机在 docker0 网桥上的地址是 172.17.0.1。
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="docker host and bridge"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1598795356499-4e5062a6-9ae5-4339-bcf4-882dadce3122.png"
+    fill={true}
+  />
+</div>
+
+容器内的 IP：
+
+<div className="relative h-[400px]">
+  <Image
+    style={{ objectFit: 'contain' }}
+    className="my-0"
+    alt="container IP"
+    src="https://cdn.nlark.com/yuque/0/2020/png/438262/1598795372361-08f83bd7-109f-4b15-a4d4-596688800266.png"
+    fill={true}
+  />
+</div>
+
+由此可知他们在同一网段下。
+
+在开发调试的时候，bridge 模式的容器要访问宿主机的 ip，还可以通过 [host.docker.internal](https://docs.docker.com/docker-for-windows/networking/#use-cases-and-workarounds) 这个指定的 DNS 名称来访问。
+
+### 通过自定义 bridge 模式实现容器互联
+
+虽然在 bridge 模式下容器之间可以通过子网段的 ip 地址互联，但是无法保证 docker 每次启动后都是 docker0 的网段都是一样的。所以需要一种别名的方式来代替各容器的 ip 地址。
+
+针对外界网络，自定义 bridge 模式提供了更好的隔离型，而针对同一 bridge 下的容器，则有更好的互通性。
+
+具体步骤如下：
+
+1. 创建自定义 bridge
+
+```bash
+docker network create -d bridge my-net
+```
+
+2. 将容器连接到该 bridge
+
+```bash
+docker network connect my-net nginx_demo
+docker network connect my-net ubuntu_demo
+```
+
+3. 进入容器检查互通性
+
+```bash
+docker exec -it ubuntu_demo bash
+# 可以通过容器名称访问容器
+curl http://nginx_demo
+```
+
+4. 断开和默认网桥的连接
+
+```bash
+docker network disconnect bridge nginx_demo
+docker network disconnect bridge ubuntu_demo
+```
+
+## Dockerfile
+
+### docker build
+
+```bash
+docker build [options] PATH | URL
+```
+
+docker build 需要 **Dockerfile**  和 **context** 。 **context**  可以是本地文件路径或者是一个 git 仓库的地址。构建的时候会将整个 context 的内容上传到 docker daemon。删除不必要的文件可以加快构建过程。
+
+```bash
+# 默认 Dockfile 的位置为 context 的第一级目录
+# 指定 Dockerfile 的位置和 context 为当前路径
+docker build -f /path/Dockfile .
+```
+
+docker 会在构建的时候使用中间镜像来加速构建。
+
+####
+
+### 格式
+
+1. 行首为 # 的都视为注释
+2. 可以在 FROM 指令前面的，只有 parser directives, comments, 和 global args.
+3. 使用 \ 作为行连接符
+4. 指令建议都用大写
+
+#### parser directives
+
+编译指定以**键值对注释**的形式放在 Dockerfile 文件的最顶层。不是放在最顶层的 parser directives 都视为普通注释。目前支持的 parser directives 有：
+
+- syntax: 指定 Dockerfiel builder 的位置。
+
+```bash
+# syntax=docker/dockerfile
+# syntax=docker/dockerfile:1.0
+# syntax=docker.io/docker/dockerfile:1
+# syntax=docker/dockerfile:1.0.0-experimental
+# syntax=example.com/user/repo:tag@sha256:abcdef...
+```
+
+这个只有在启用 Buildkit 的时候才会起作用，如果不想使用 Docker build 新的特性的话，保持默认不指定就好。
+
+#### escape
+
+```bash
+# escape=\
+```
+
+指定 Dockerfile 的行连接符， 默认是反斜杠。
+
+### ENV 指令
+
+```bash
+ENV key value
+ENV key=value
+
+ENV mycat Jonhn jeffy
+# 等价于
+ENV mycat=John\ jeffy
+```
+
+在 Dockerfile 文件中可以用 ${variablename} 或者 $variablename 的形式引用。
+
+```bash
+FROM busybox
+ENV foo /bar
+WORKDIR ${foo}   # WORKDIR /bar
+ADD . $foo       # ADD . /bar
+COPY \$foo /quux # COPY $foo /quux
+```
+
+**ENV 指定设置的环境变量会一直存在于镜像中** 。这个可能会造成一些影响。在单个指令中指定环境变量，可以这样做：
+
+```bash
+RUN key=value command
+```
+
+## .dockerignore
+
+dockerignore 文件允许你指定包含或者忽略哪些文件参与构建。忽略的文件将不会发送到 docker daemon。
+
+```bash
+# 忽略所有 md 文件
+*.md
+# 但是允许 readme md
+!readme*.md
+# /somedir/temporary.txt
+*/temp*
+# /somedir/subdir/temporary.txt
+*/*/temp*
+# ** 表示任意层级的文件夹
+# /temp
+# /dir/temp
+**temp
+```
+
+### ARG
+
+在 Dockfile 的顶部设置变量以供后面的命令使用
+
+```bash
+ARG VERSION=latest
+FROM node:${VERSION}
+```
+
+### FROM
+
+FROM 指令指定镜像的基础镜像。
+
+```bash
+FROM [--platform=<platform>] <image>[:<tag>] [AS <name>]
+```
+
+- 多阶段构建的时候一个 Dockerfile 文件里面有多个 FROM 指令。
+- Tag 是可选的，如果不指定，默认是 latest
+- name 用于多阶段构建时 COPY 指令 `COPY --from=<name|index>`
+
+### RUN
+
+两种形式
+
+```bash
+RUN command paramer1
+# 必须使用双引号
+RUN ["command", "paramer1"]
+```
+
+RUN 命令默认会生成 cache，也就是中间镜像，以供下次构建，可以通过命令指定不生成 cache。
+
+```bash
+docker build --no-cache .
+```
+
+### CMD
+
+CMD 有三种形式
+
+- `CMD ["executable","param1","param2"]`  (_exec_ form, this is the preferred form)
+- `CMD ["param1","param2"]` (as _default parameters to ENTRYPOINT_)
+- `CMD command param1 param2` (_shell_ form)
+
+```bash
+CMD ["sh", "-c", "/usr/start.sh", "--someflag"]
+# 等价于
+CMD sh -c /usr/start.sh --someflag
+```
+
+**如果数组中的第一个元素不是可执行，则是第二种形式，作为 ENTRYPOINT 的参数，**
+
+**会被 docker run 和 ENTRYPOINT 覆盖。**
+
+### ENTRYPOINT
+
+ENTRYPOINT 有两种形式
+
+```bash
+# exec form
+ENTRYPOINT ["executable", "param1", "param2"]
+# shell form
+ENTRYPOINT command param1 param2
+```
+
+CMD 和 ENTRYPOINT 都可作为启动容器时默认的执行命令，他们的相互作用如下表
+
+|                                | No ENTRYPOINT              | ENTRYPOINT exec_entry p1_entry |     ENTRYPOINT [“exec_entry”, “p1_entry”]      |
+| ------------------------------ | :------------------------- | :----------------------------- | :--------------------------------------------: |
+| **No CMD**                     | _error, not allowed_       | /bin/sh -c exec_entry p1_entry |              exec_entry p1_entry               |
+| **CMD [“exec_cmd”, “p1_cmd”]** | exec_cmd p1_cmd            | /bin/sh -c exec_entry p1_entry |      exec_entry p1_entry exec_cmd p1_cmd       |
+| **CMD [“p1_cmd”, “p2_cmd”]**   | p1_cmd p2_cmd              | /bin/sh -c exec_entry p1_entry |       exec_entry p1_entry p1_cmd p2_cmd        |
+| **CMD exec_cmd p1_cmd**        | /bin/sh -c exec_cmd p1_cmd | /bin/sh -c exec_entry p1_entry | exec_entry p1_entry /bin/sh -c exec_cmd p1_cmd |
+
+容器的启动命令，Dockerfile 中可以有多条 ENTRYPOINT，但只有最后一条生效。
+
+CMD 和 docker run 之后的参数会当作参数传给 ENTRYPOINT。
+
+### LABEL
+
+指定镜像的标签
+
+```bash
+LABEL author=jelee
+
+# 使用 docker inspect 查看镜像标签
+docker image inspect --format="" myimage
+
+{
+	"author": "jelee"
+}
+```
+
+### EXPOSE
+
+```bash
+EXPOSE <port1> [<port2>/<protocol>...]
+EXPOSE 80 80/tcp
+```
+
+声明容器要监听的宿主机端口 port1 要转发的 容器内端口 port2，同时指定端口协议为 tcp。
+
+可以通过 `docker run -p 8888:80/tcp` 命令覆盖。
+
+### ADD COPY
+
+```bash
+ADD [--chown=<user>:<group>] <src>... <dest>
+ADD [--chown=<user>:<group>] ["<src>",... "<dest>"]
+COPY [--chown=<user>:<group>] <src>... <dest>
+COPY [--chown=<user>:<group>] ["<src>",... "<dest>"]
+
+# 添加所有 hom 开头的文件
+ADD hom* /mydir/
+# ? 表示单个字符
+ADD hom?.txt /mydir/
+```
+
+这两个命令都是用来将 src (可是是 url 或者是文件，文件夹)复制到镜像 dest中。区别：
+
+1. COPY 只复制 src 文件夹中的内容，不包括自身文件夹
+2. COPY 可指定 `--from=<name|index>` 从中间镜像中复制内容
+3. 在 ADD 中，如果src 是 tar,zip,tgx, xz 等归档文件，将会自动解压
+
+## 相关错误
+
+1. docker 映射端口报错  
+   **driver failed programming external connectivity on endpoint nervous_villani**
+
+解决办法： 重启docker
+
+```bash
+systemctl restart docker
+```
+
+2. 打包镜像的时候安装 yarn，执行失败
+
+[解决办法是](https://github.com/yarnpkg/yarn/issues/869) ：
+
+```bash
+RUN curl -o- -L https://yarnpkg.com/install.sh | bash
+RUN $HOME/.yarn/bin/yarn install
+```
+
+## 参考
+
+[docker 网络模式](https://www.linuxidc.com/Linux/2020-04/163007.htm)
+
+[容器访问宿主机ip](https://docs.docker.com/docker-for-mac/networking/)
+
+[Docker 容器间通信方法](https://juejin.im/post/6844903847383547911)
