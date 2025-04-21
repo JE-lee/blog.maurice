@@ -1,0 +1,179 @@
+---
+title: 非必要不使用 React.useEffect
+date: 2025-04-20
+lastmod: 2025-04-21T03:38:39.321Z
+tags:
+  - React Native
+  - 前端框架
+  - 新技术趋势
+summary: '`useEffect` 的使用复杂，依赖参数影响执行时机，过度使用易导致代码混乱，建议谨慎使用。'
+draft: false
+images: []
+---
+
+`React.useEffect` 可以说是所有 hooks 中最难使用，最难用好的一个 hook 了。
+
+它的第二个参数 dependencies ，当不穿，传空，传多个的时候意义完全不一样。
+
+当 useEffect 的 dependencies 参数不传的时候，执行的时机相当于 class 组件的 `componentDidUpdate` 生命周期。
+
+当 useEffect 的 dependencies 参数传空数组的时候，相当于 class 组件的 `componentDidMount`， `componentWillUnmount`。
+
+当 useEffect 的 dependencies 参数需要传具体的依赖的时候，每当依赖项数组变化的时候，都会执行。
+
+说它难使用主要是 dependencies 参数无法自动化，依赖于人去识别和判断, 增加复杂度。说它难用好是因为如果开发者很容易过度地使用 useEffect, 造成代码逻辑的混乱，形成屎山。
+
+### 大量意义不明的空数组
+
+当我们需要模拟 `componentDidMount` 的时候, 通常会传入一个空数组，表示这个 effect 只执行一次。
+
+```javascript
+useEffect(() => {
+  init()
+}, [])
+```
+
+在代码中，充斥着大量这样的空数组，看上去很多余，而且不能直观地反映出这段代码的意图。我们可以通过自定义 hook 来解决这个问题。
+
+```javascript
+const useInit = (init, dispose) => {
+  React.useEffect(() => {
+    if (isFunction(init)) {
+      init()
+    }
+    return isFunction(dispose) ? dispose : undefined
+  }, [])
+}
+```
+
+### 闭包问题
+
+在 useEffect 函数中，我们能访问到的组件 state 变量取决于该 effect 函数被定义时所在的作用域。也就是说，如果没有将所有访问到的 react 变量都加入依赖数组中，那么访问到的数据就有可能是过时的，不正确的。
+
+但是我们一旦因为要解决闭包问题而降所有依赖项都加入，那么会遇到其他更麻烦的问题。
+
+```javascript
+function ChatRoom = ({ roomId, theme }) => {
+	useEffect(() => {
+		const connection = createConnection(serverUrl, roomId)
+		connection.on('connected', () => {
+			showNotification('Connected!', theme)
+		})
+
+		connection.connect();
+		return () => connection.disconnect()
+	}, [roomId, theme])
+}
+```
+
+在上面的例子中，如果我们不将 theme 加入依赖数组中，在 connected 事件中访问到的 theme 变量可能是旧的值。当我们将其加入依赖数组之后，虽然解决了访问旧值的问题，但是每次修改 theme 的时候，都会断开和重连，这明显不是我们想要的。
+
+我们可以将 theme 转换为 ref (例如 ahooks 中的 useLatest), 这样在 effect 函数中访问到的值永远都是最新的了。
+
+### 过度的响应式编程
+
+useEffect 最大的一个问题是容易让人以"监听"的方式去写代码。
+
+```typescript
+// 渲染过程也依赖 pageNo 和 projectList 这两个状态
+const [pageNo, setPageNo] = useState(1)
+const [projectList, setProjectList] = useState([])
+const handlePageNoBtnClick = (targetPageNo) => {
+  setPageNo(targetPageNo)
+}
+
+const handleNextPageBtnClick = () => {
+  const targetPageNo = pageNo + 1
+  setPageNo(targetPageNo)
+}
+
+const handlePrevPageBtnClick = () => {
+  const targetPageNo = pageNo - 1
+  setPageNo(targetPageNo)
+}
+
+// 🟡 当 fetchProjectList 内的逻辑被修改后，难以评估这个改动的影响面
+const fetchProjectList = useCallback(async () => {
+  const query = qs.stringify({
+    projectType: props.projectType, // projectType 是通过 props 获得的
+    pageSize: 20,
+    pageNo,
+  })
+  const response = await fetch(`/project/list?${query}`)
+  const json = await response.json()
+  setProjectList(json)
+}, [pageNo, props.projectType])
+
+useEffect(() => {
+  fetchProjectList()
+}, [fetchProjectList])
+```
+
+如上，分页的功能被切割成多个小的逻辑片段，依靠 useEffect 中的依赖项来连接。
+例如： '点击下一页'的流程是
+`修改PageNo` --> `触发 fetchProjectList chanaged` --> `触发 useEffect，重新请求数据`。
+
+虽然每个片段内的逻辑是完整的，但是片段与片段之间的联系并不直观和清晰，这给后续的维护带来很大的难度。
+
+回到标题部分，为什么说**非必要不使用 useEffect**, 原因就在于这里。当我们的代码中充斥着这样的状态监听组成的逻辑，也就意味着这个项目已经变成屎山了。试想一下，这时候的 useEffect 不就是和 Vue 的 `watch` `watchEffect` 一样了吗，而 Vue 编程的一个准则就是**在使用 watch 的时候，请思考3遍，是否真的需要 watch**。
+
+useEffect 更偏向的应该是 `effect` 部分，即由状态变化触发的逻辑。
+而像上面的例子中的`上一页`， `下一页` 的功能都应该属于 Event 事件，不应该放在 Effect 中处理。
+
+```typescript
+import { useCallback, useEffect, useState } from "react";
+
+type PaginationProps = {
+  autoLoad?: boolean;
+  defaultPageNo?: number;
+  children: (list: Record<string, unknown>[]) => React.ReactNode;
+  fetch: (ctx: { pageNo: number, pageSize: number }) => Promise<{ total: number, data: Record<string, unknown>[] }>;
+};
+
+export function Pagination(props: PaginationProps) {
+  const [pageNo, setPageNo] = useState(props.defaultPageNo || 0)
+  const [total, setTotal] = useState(0)
+  const [list, setList] = useState<Record<string, unknown>[]>([])
+  const pageSize = 10
+
+
+  const fetchData = useCallback(async (pageNo: number, pageSize: number) => {
+    const { total, data } = await props.fetch({ pageNo, pageSize });
+    setTotal(total);
+    setList(data)
+  }, [])
+
+  useInit(() => {
+    if (typeof props.autoLoad === 'undefined' ? true : props.autoLoad) {
+      fetchData(pageNo, pageSize);
+    }
+  })
+
+  const handlePrev = () => {
+    const newPageNo = Math.max(0, pageNo - 1)
+    setPageNo(newPageNo);
+    fetchData(newPageNo, pageSize);
+  }
+
+  const handleNext = () => {
+    const newPageNo = pageNo + 1;
+    setPageNo(newPageNo);
+    fetchData(newPageNo, pageSize);
+  }
+
+  return (
+    <div>
+      {props.children(list)}
+      {/* Pagination controls will go here */}
+      <button onClick={() => handlePrev()} disabled={pageNo <= 0}>
+        Previous
+      </button>
+      <span>Page {pageNo}</span>
+      <span>Total: {total}</span>
+      <button onClick={() => handleNext()}>
+        Next
+      </button>
+    </div>
+  );
+}
+```
