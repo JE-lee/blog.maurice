@@ -23,13 +23,15 @@ SSL协议的核心是非对称加密算法。在非对称加密算法中，存�
    <span className="text-red-700">服务端的附加信息</span>，以及由
    <span className="text-red-700">CA私钥加密的签名数据</span>
    （签名一般是数据的hash值）组成的证书。证书的作用就是用来服务器的信息，类似于身份证。
-   <div className="relative h-[400px]">
+   <div className="relative max-h-[400px] max-w-full">
      <Image
        style={{ objectFit: 'contain' }}
-       className="my-0"
+       className="my-0 h-auto max-h-[400px] w-auto max-w-full"
        alt="fiddler screenshot"
        src="https://cdn.nlark.com/yuque/0/2020/png/438262/1599141580537-1b97cdaa-e024-4587-843e-4baf4a53a603.png"
-       fill={true}
+       width={0}
+       height={0}
+       sizes="100vw"
      />
    </div>
 3. 客户端使用预置的 CA 列表检查证书的有效性，即是否属于请求的域名，签发机构是否信任等，同时客户端使用相同的算法生成签名，和由<span className="text-red-700">CA公钥解密出来的签名数据比较</span>，如果不一致，说明证书被篡改过，浏览器会提示用户该连接不安全。
@@ -39,13 +41,15 @@ SSL协议的核心是非对称加密算法。在非对称加密算法中，存�
    <span className="text-red-700">对称加密算法</span>
    进行通信。(因为使用非对称加密算法加密所有的数据对机器的压力太大，所以后续的通信都是用性能比较好的对称加密算法加密数据。)
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583401228213-a58bd5b8-a388-4428-9e65-fe97062e7ae4.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -59,13 +63,15 @@ CA证书是有信用等级的，高层的证书可以给底层的证书做信用
 
 在chrome --> 隐私设置和安全性 --> 证书管理中，我们可以看下浏览器信任的根证书都有哪些。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583461721487-8cf7082b-a96f-4e57-bd89-631ec811c0bf.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -73,13 +79,15 @@ CA证书是有信用等级的，高层的证书可以给底层的证书做信用
 
 SSL证书通常来说都是收费的，并且价格还不菲。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583462541282-76324e2f-9280-415b-9931-f47a8da29740.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -178,13 +186,15 @@ httpsServer.listen(8001)
 
 此时如果访问https://localhost:8001，浏览器会提示privacy error。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583483384164-4b92161f-9c5d-4ee5-a422-e4bfde31adfa.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -198,13 +208,15 @@ httpsServer.listen(8001)
 
 此时再次访问https://example.com:8001, 浏览器依然提示privacy error。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583483736848-a34589cc-ab3f-4554-a772-1d62ea99584b.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -215,23 +227,27 @@ httpsServer.listen(8001)
 
 在控制台中打开security, 然后选择View certificate， 将证书文件导出，之后双击安装。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583483906547-1755d174-8958-4eef-90ad-98f6a1c92151.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583484016937-31a43f4c-7046-40ba-96f4-f86afeca37b3.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

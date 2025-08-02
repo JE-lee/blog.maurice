@@ -28,13 +28,15 @@ Javascript 采用的是 **静态作用域** ，也就是说 Javascript 的作�
 
 在每一个 **lexical environment **都有 outer reference 用来表示对外部词法环境的引用。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1604114096582-1d950b26-aade-42f2-9566-946cc8fc22bf.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -63,13 +65,15 @@ const greet = _greet()
 
 在控制台输出一个函数的时候，默认会调用 **toString** 方法输出函数体。要想查看函数对象原本的属性，可以使用 **function.ptototype.constructor。**而函数作用域为 **scope **属性
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1604116240900-dba6545a-bfd2-4f35-8a0b-edae81bbfe0b.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

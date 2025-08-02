@@ -9,13 +9,18 @@ import prettier from 'prettier'
 
 configDotenv({ path: path.resolve(import.meta.dirname, '../../.env.local') })
 
-const OBSIDIAN_VAULT = '/Users/wuliheng/Documents/obsidian'
+const OBSIDIAN_VAULT = '/home/who/Workspace/obsidian-myvault'
 const OBSIDIAN_BLOG_DIR = path.resolve(OBSIDIAN_VAULT, 'blog')
 const BLOG_DIR = path.resolve(import.meta.dirname, '../../data/blog')
 const IMG_DIR = path.resolve(import.meta.dirname, '../../public/static/images/blog') // 所有图片都放在这里
 
 const obsidianBlogs = await glob('**/*.md', { cwd: OBSIDIAN_BLOG_DIR, absolute: true })
 for (const blog of obsidianBlogs) {
+  const { frontmatter } = extractFrontmatter(await fs.readFile(blog, 'utf8'))
+  // skip draft blog
+  if (frontmatter?.draft) {
+    continue
+  }
   await copyBlog(blog)
 }
 
@@ -75,15 +80,16 @@ async function generateNextImage(image) {
   let src = path.relative(path.resolve(import.meta.dirname, '../../public'), image)
   src = path.join('/', src)
 
-  const { width, height } = await getImageSize(image)
-
   const nextImage = `
 <div className="flex justify-center">
   <Image
-    alt="courier-new-fallback-font"
+    alt="${path.basename(image)}"
     src="${src}"
-    width={${width}}
-    height={${height}}
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 w-auto h-auto max-h-[400px] max-w-full"
+    style={{ objectFit: "contain" }}
   />
 </div>
 `
@@ -103,7 +109,7 @@ function getImageSize(image) {
 }
 
 async function maybeAddFrontmatter(raw, blogPath) {
-  const { content: withoutFrontMatter } = extractFrontmatter(raw)
+  const { content: withoutFrontMatter, frontmatter: frontmatterFromRaw } = extractFrontmatter(raw)
   raw = withoutFrontMatter
 
   const destFile = getBlogDest(blogPath)
@@ -125,12 +131,11 @@ ${yaml.stringify(destFileFrontMatter)}
       )
     }
   }
-
   const tags = await generateTags(raw)
   const summary = await generateSummary(raw)
   const frontmatter = {
     title: path.basename(blogPath, path.extname(blogPath)),
-    date: fsStat.birthtime.toISOString().split('T')[0],
+    date: frontmatterFromRaw.date || fsStat.birthtime.toISOString().split('T')[0],
     lastmod: lastmod,
     tags: tags,
     summary: summary,

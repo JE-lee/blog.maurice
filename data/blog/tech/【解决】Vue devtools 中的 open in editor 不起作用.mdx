@@ -1,0 +1,194 @@
+---
+title: 【解决】Vue devtools 中的 open in editor 不起作用
+date: 2025-05-28
+lastmod: 2025-08-02T05:06:45.956Z
+tags:
+  - Vue
+  - 开发环境
+  - 调试技巧
+summary: '`vue-devtool` 插件的“open in editor”功能在使用`wsl +
+  cursor`时失效，通过设置环境变量`LAUNCH_EDITOR`为`cursor`解决了问题。'
+draft: false
+images: []
+---
+
+`vue-devtool` 浏览器插件提供了 **open in editor** 的功能。
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250701105350.png"
+    src="/static/images/blog/Pasted image 20250701105350.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+点击后，就会在 `vscode` 或者 `cursor` 中打开选中组件的代码文件。
+
+当我使用 `wsl + cursor` 开发的时候，这个功能失效了。它没有在 cursor 中打开组件文件，而是在终端窗口使用 vi 打开了。
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250702101929.png"
+    src="/static/images/blog/Pasted image 20250702101929.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+这点还是很影响开发体验的，毕竟我可以说是深度依赖这个功能了。所以我花了一点时间(整整一个下午)来解决这个问题。
+
+首先，我们来梳理一下这个功能流程：
+
+1. Vue 在开发模式编译的时候，会将组件文件地址和组件绑定在一起。
+2. 点击 `Vue-devtool`的 open in editor 按钮，会发送 **/open-in-editor?file=xxxx** 请求到 webpack dev server 中。
+3. dev server 根据事先注册好的路由 middleware (通过[lanuch-editor](https://github.com/yyx990803/launch-editor)注册的)，开始处理请求。
+4. launch-editor 会根据目前正在运行的编辑器进程来觉得该使用哪个编辑器。
+5. 确定好之后，在子进程中执行命令打开请求参数中 file 所指向的文件，如 `code xxxxx` 来打开文件。
+
+流程很简单，自动打开的功能和我们在 terminal 中手动执行 `code src/views/xxx.vue` 来打开文件的效果是一样的。
+
+但是我在使用 `wsl + cursor` 的时候，这个功能不是在 cursor 中打开组件文件，而是在命令行中直接打开了。
+
+究其原因，我认为问题可能出现在流程的最后两步上。现在让我们来逐个排查。
+
+先在 wsl ubuntu 的 bash terminal, 手动执行命令，
+
+```bash
+cursor src/views/test.vue
+```
+
+发现 cursor 编辑器自动打开了该文件，说明这一步没有问题。
+
+那么问题应该出在了 launch-editor 选择编辑器这一步上，为什么没有使用 `cursor` 来打开文件？
+
+查看 `launch-editor`的源码，我们可以看到关键的一步是在 `guessEditor` 中，让我们添加 debugger 来调试一下。
+
+```javascript
+function launchEditor(file, specifiedEditor, onErrorCallback) {
+  const parsed = parseFile(file)
+  let { fileName } = parsed
+  const { lineNumber, columnNumber } = parsed
+
+  if (typeof specifiedEditor === 'function') {
+    onErrorCallback = specifiedEditor
+    specifiedEditor = undefined
+  }
+
+  // 1. 根据系统的编辑器进程决定使用哪个编辑器
+  const [editor, ...args] = guessEditor(specifiedEditor)
+  debugger
+  if (!editor) {
+    onErrorCallback(fileName, null)
+    return
+  }
+
+  if (process.platform === 'win32') {
+  } else {
+    // 2. 在子进程中执行编辑器打开文件的命令
+    _childProcess = childProcess.spawn(editor, args, { stdio: 'inherit' })
+  }
+}
+```
+
+重新开一个终端，选择 `JavaScrpt Debugger Terminal`
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250701143653.png"
+    src="/static/images/blog/Pasted image 20250701143653.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+然后执行我们的项目开发命令 `npm run dev`
+
+等项目启动后，再次点击 open in editor 按钮，就会命中断点，此时我们可以看到 `guessEditor` 返回的是 `vi`, 难怪没有在 cursor 编辑中打开了
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250701144031.png"
+    src="/static/images/blog/Pasted image 20250701144031.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+进一步探索下 `guessEditor` 函数，它主要的功能就是会根据当前系统正在运行的编辑器进程(通过 `ps x --no-heading -o comm --sort=comm` 命令查看当前进程信息)来决定应该使用什么编辑器。但是，它却没有检测到我正在使用的是 `cursor`, 所以退而求其次选择了`vi` 。
+
+没有检测到的原因我也不打算继续深究了，`launch-editor` 的文档上面好像也标注了不支持 cursor in Linux.
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250701144838.png"
+    src="/static/images/blog/Pasted image 20250701144838.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+幸好，`launch-editor` 给我们留了个口子
+
+```javacript
+module.exports = function guessEditor (specifiedEditor) {
+  if (specifiedEditor) {
+    return shellQuote.parse(specifiedEditor)
+  }
+
+  if (process.env.LAUNCH_EDITOR) {
+    return [process.env.LAUNCH_EDITOR]
+  }
+
+  if (process.versions.webcontainer) {
+    return [process.env.EDITOR || 'code']
+  }
+}
+```
+
+可以通过 `LAUNCH_EDITOR` 环境变量来显式指定要使用的编辑器。
+
+将 `export LAUNCH_EDITOR="cursor"` 写入 `.bash_profile` 中，然后 `source .bash_profile` 让其生效(也许需要重新启动 wsl)。
+打开一个新的终端，重新启动项目，然后测试 open-in-editor。😀文件终于在 cursor 中打开了。
+
+~~注意这里不能将 `LAUNCH_EDITOR` 变量写在 `.bashrc` 中。~~
+~~`.bashrc` 主要用于配置交互式 shell 会话。这意味着当你打开一个新的终端窗口时，它会执行。但是，如果你通过其他方式启动 Node.js 进程（例如，通过脚本、服务管理器或非交互式 shell），`.bashrc` 可能不会被加载。~~ (如果写在 .bashrc 不生效，那就终极大法，重启 wsl)
+
+除了修改环境变量这个方法，我还尝试了另外一种取巧的方法。那就是替换掉 webpack dev server 已经注册的 `__open-in-editor` 路由中间件，在新的中间件中显式使用 cursor 来打开文件。
+
+```javascript
+// vue.config.js
+module.exports = defineConfig({
+  devServer: {
+    setupMiddlewares(middlewares, server) {
+      const launchMiddleware = server.app._router.stack.find(item => item.name === 'launchEditorMiddleware')
+      if (launchMiddleware) {
+        // 替换处理函数
+        launchMiddleware.handle = (req, res, next) => {
+          // 提取文件路径
+          const { file } = req.query
+          // spawn 执行命令
+          childProcess.spawn('cursor', [file], { stdio: 'inherit' })
+          res.end()
+        }
+      }
+      return middlewares
+    }
+  },
+}
+```

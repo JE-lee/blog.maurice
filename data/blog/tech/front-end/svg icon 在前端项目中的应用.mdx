@@ -16,13 +16,15 @@ svg（可伸缩矢量图）已经被各大浏览器支持。它具有如下几�
 > 2. 图形线条比较简单的情况下，svg要比高清图要小
 > 3. svg比相应的高清图有更好的渲染性能。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="pixel pipe"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597419307228-0db8bc86-a633-4ab2-8085-78fe4034c595.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -81,13 +83,15 @@ name是[interpolate name](https://github.com/webpack/loader-utils#interpolatenam
 
 它的原理是将所有引入的svg都集中渲染在页面上，并且给每个symbol 加上id，通过 id 的方式在页面上使用。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="pixel pipe"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597419359961-cda421c7-c35f-4a1a-a760-7f2bb51345d9.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

@@ -46,13 +46,15 @@ function test(times, geneFn) {
 test(10000 * 10, hat)
 ```
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597419065571-5d8fdbf3-8459-4a71-bff7-ff1aa9207edd.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

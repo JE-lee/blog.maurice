@@ -13,48 +13,56 @@ summary: 最近开发了一个休息提醒的PWA应用，使用React和TypeScrip
 最近写了一个休息提醒的 PWA 的应用，用来设定工作一段时间后，提醒我要休息了。有点类似于番茄时钟。
 应用地址是[这个～](https://pomodoro-clock-pwa.vercel.app/)。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690291909922-bca25574-b801-4ae6-b6ee-d32d86a0efe2.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
 它的功能包括：
 
 - 工作倒计时结束后，会通过浏览器 Notification 通知到我
-  <div className="relative h-[400px]">
+  <div className="relative max-h-[400px] max-w-full">
     <Image
       style={{ objectFit: 'contain' }}
-      className="my-0"
+      className="my-0 h-auto max-h-[400px] w-auto max-w-full"
       alt="fiddler screenshot"
       src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690292100204-05f321ef-9f3d-4fa4-acf9-a931b26dacad.png"
-      fill={true}
+      width={0}
+      height={0}
+      sizes="100vw"
     />
   </div>
 - 可以设定每次的工作时长，休息时长，提示语。
-  <div className="relative h-[400px]">
+  <div className="relative max-h-[400px] max-w-full">
     <Image
       style={{ objectFit: 'contain' }}
-      className="my-0"
+      className="my-0 h-auto max-h-[400px] w-auto max-w-full"
       alt="fiddler screenshot"
       src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690292163537-49c9ca8f-ae72-46cc-ad86-a89c23335006.png"
-      fill={true}
+      width={0}
+      height={0}
+      sizes="100vw"
     />
-  </div>{' '}
+  </div>
 - 查看当前年的工作/休息热力图
-  <div className="relative h-[400px]">
+  <div className="relative max-h-[400px] max-w-full">
     <Image
       style={{ objectFit: 'contain' }}
-      className="my-0"
+      className="my-0 h-auto max-h-[400px] w-auto max-w-full"
       alt="fiddler screenshot"
       src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690292247266-95cd59df-4039-4b1e-bd84-0c8c5a406a0a.png"
-      fill={true}
+      width={0}
+      height={0}
+      sizes="100vw"
     />
-  </div>{' '}
+  </div>
 
 最开始我在网上找了一些休息提醒的应用，但是都不太满意，于是想着就自己写一个。正好可以应用一些新技术，比如说 react，pwa， google analytics，离线应用等。
 
@@ -68,16 +76,17 @@ summary: 最近开发了一个休息提醒的PWA应用，使用React和TypeScrip
 
 1. prettier 预设的 code style 很好，但是想要在这上面个性化却很难。
 2. 有时候只是修改了一点点东西，却触发了最大长度强制换行。这在 git diff 视图中很困扰。
-   {' '}
-   <div className="relative h-[400px]">
+   <div className="relative max-h-[400px] max-w-full">
      <Image
        style={{ objectFit: 'contain' }}
-       className="my-0"
+       className="my-0 h-auto max-h-[400px] w-auto max-w-full"
        alt="fiddler screenshot"
        src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690293377150-2e9767a3-cc1d-4d43-9d01-0a5017d2e663.png"
-       fill={true}
+       width={0}
+       height={0}
+       sizes="100vw"
      />
-   </div>{' '}
+   </div>
 3. 和 eslint 有些功能配置存在冲突。
 4. eslint 和 prettier 需要两个不同的 parser，对机器也是一种负担。
 
@@ -109,26 +118,30 @@ summary: 最近开发了一个休息提醒的PWA应用，使用React和TypeScrip
 整体使用下来，还是有几处地方的 code style 做的不好（也许配置好对应的 eslint 规则就可以满足）
 
 1. 链式调用没有要求换行，看起来不直观。
-   <div className="relative h-[400px]">
+   <div className="relative max-h-[400px] max-w-full">
      <Image
        style={{ objectFit: 'contain' }}
-       className="my-0"
+       className="my-0 h-auto max-h-[400px] w-auto max-w-full"
        alt="fiddler screenshot"
        src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690294013662-c2063267-ac09-4248-a92b-f09014103380.png"
-       fill={true}
+       width={0}
+       height={0}
+       sizes="100vw"
      />
-   </div>{' '}
+   </div>
 2. 对于 jsx ，没有设置好的 code style 规则。className 可以写很长很长，不好看，需要手动调整。如果是 prettier 的话，会自动格式化好标签的属性，看起来就比较舒服。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690294129875-cdde1063-44b3-473a-b092-bfcfaa23b3f2.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
-</div>{' '}
+</div>
 
 其他体验都挺好。
 
@@ -242,15 +255,17 @@ sentry-cli sourcemaps inject --org maurice-rk --project pomodoro-clock-pwa ./bui
 
 直接就可以进行应用错误监控啦
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690296896993-9e40c639-5da3-4e07-a9dd-9dbd2282ce2e.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
-</div>{' '}
+</div>
 
 sentry 不仅支持前端应用，也支持 node.js 应用，其他语言也支持。
 
@@ -281,12 +296,14 @@ npx tailwindcss init
 
 前提是在项目根目录下面，有 tailwind.config.js 这个配置文件。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2023/png/438262/1690339448415-c7ba275d-f3aa-4a0a-8695-568add6528bc.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
-</div>{' '}
+</div>

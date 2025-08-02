@@ -12,7 +12,8 @@
     "prepare": "husky",
     "fontsubset": "npx zx scripts/fontsubset/fontsubset.mjs",
     "obsidian-sync": "npx zx scripts/obsidian-sync/index.mjs",
-    "generate-frontmatter": "npx zx scripts/obsidian-sync/generate-frontmatter.mjs ./data/blog"
+    "generate-frontmatter": "npx zx scripts/obsidian-sync/generate-frontmatter.mjs ./data/blog",
+    "blog:prettier": "prettier --write ./data/blog/**/*.mdx --parser=markdown"
   },
   "dependencies": {
     "@headlessui/react": "1.7.19",

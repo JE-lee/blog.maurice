@@ -1,12 +1,12 @@
 ---
 title: 如何查看 LangChain.js 发出的请求
-date: 2025-02-15
-lastmod: 2025-03-02T08:51:17.047Z
+date: 2024-12-29
+lastmod: 2025-08-02T05:06:45.956Z
 tags:
   - 调试技巧
   - Node.js
   - 新技术趋势
-summary: 为了调试 LangChain 请求信息，可以设置 `DEBUG=true` 查看 HTTP 请求，或使用自定义 fetch 和代理工具监测。
+summary: 本文介绍了如何调试 LangChain 的 HTTP 请求，包括设置 DEBUG 环境变量、使用自定义 fetch 和代理工具监控请求信息。
 draft: false
 images: []
 ---
@@ -22,17 +22,17 @@ images: []
 `openai` 可以接收一个自定义的 fetch，我们可以在这个自定义的 fetch 进行 request 和 response 的拦截。
 
 ```typescript
-import { fetch } from "undici"; // as one example
-import OpenAI from "openai";
+import { fetch } from 'undici' // as one example
+import OpenAI from 'openai'
 
 const client = new OpenAI({
   fetch: async (url: RequestInfo, init?: RequestInit): Promise<Response> => {
-    console.log("About to make a request", url, init);
-    const response = await fetch(url, init);
-    console.log("Got response", response);
-    return response;
+    console.log('About to make a request', url, init)
+    const response = await fetch(url, init)
+    console.log('Got response', response)
+    return response
   },
-});
+})
 ```
 
 而 `@langchain/openai` 保留了个参数，用来透传 `openai` 的初始化参数。
@@ -40,10 +40,10 @@ const client = new OpenAI({
 ```typescript
 const model = new ChatOpenAI({
   temperature: 0.8,
-  model: "gpt-4o-mini",
+  model: 'gpt-4o-mini',
   verbose: true,
   fetch: async () => {},
-});
+})
 ```
 
 ## HTTP monitor
@@ -54,25 +54,28 @@ const model = new ChatOpenAI({
 2. 设置 `@langchain/openai` 的 proxy agent.
 
 ```typescript
-import { HttpsProxyAgent } from "https-proxy-agent";
+import { HttpsProxyAgent } from 'https-proxy-agent'
 const model = new ChatOpenAI({
   temperature: 0.8,
-  model: "gpt-4o-mini",
+  model: 'gpt-4o-mini',
   verbose: true,
   configuration: {
-    httpAgent: new HttpsProxyAgent("http://10.68.246.203:9091"),
+    httpAgent: new HttpsProxyAgent('http://10.68.246.203:9091'),
   },
-});
+})
 ```
 
 之后就可以通过 network panel 来查看 http 请求信息了
 
 <div className="flex justify-center">
   <Image
-    alt="courier-new-fallback-font"
+    alt="proxyman network panel.png"
     src="/static/images/blog/proxyman network panel.png"
-    width={1792}
-    height={1014}
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
   />
 </div>
 

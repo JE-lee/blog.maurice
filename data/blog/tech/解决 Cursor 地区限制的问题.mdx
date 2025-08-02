@@ -1,0 +1,248 @@
+---
+title: 解决 Cursor 地区限制的问题
+date: 2025-07-12
+lastmod: 2025-08-02T05:06:45.956Z
+tags:
+  - 开发环境
+  - 前端性能优化
+  - 新技术趋势
+summary: 由于Cursor限制，中国大陆IP无法使用大模型，作者分享了两种绕过方法，但在WSL中遇到问题。
+draft: false
+images: []
+---
+
+Cursor 限制地区后，来自中国大陆的 IP 流量一律不能使用 Gemini, Claude 的大模型，😂Cursor 严重降智，使用体验大幅下降，快要到弃坑的地步了。
+
+经过一番搜索尝试之后，找到两种方式来绕过 Cursor 的检测机制。
+
+1.  海外节点 + disable http2 + socks proxy
+2.  海外节点 + tun 模式
+
+先说明下我的工作环境：
+操作系统： Windows 11 + WSL + mirrored network
+网络： 需要访问局域网内解析的网站，非公网的网站
+工具： Clash for Windows
+
+## 方式 1
+
+这种方式最简单，需要配置的地方不多。由于我的 WSL 的网络策略已经设置为 mirrored
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250725150722.png"
+    src="/static/images/blog/Pasted image 20250725150722.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+所以在 WSL 里面也能够直接使用本机的 Http Proxy。只需要设置下 Cursor
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250725150916.png"
+    src="/static/images/blog/Pasted image 20250725150916.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+或者直接在 settings.json 里面输入
+
+```json
+{
+  "cursor.general.disableHttp2": true,
+  "http.proxy": "socks5://127.0.0.1:7890"
+}
+```
+
+此时 Cursor 发出的请求都会经过 Proxy。
+
+## 方式 2
+
+方式 1 虽然简单，但是强制使用 http1 长链接，牺牲掉了 HTTP2/3 带来的性能提升，延迟也会变得更高，不是最优的方式。
+
+1. clash 设置 tun mode
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250725164905.png"
+    src="/static/images/blog/Pasted image 20250725164905.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+2.  WSL 设置 网络模式 mirrored以及禁用 DNS 隧道。
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250725165048.png"
+    src="/static/images/blog/Pasted image 20250725165048.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+3. 重启 WSL。 wsl --shutdown
+4. 验证模型是否可用，选择一个 Claude 的模型进行 chat，发现没问题。
+
+本以为这样子就万事大吉了，但是我发现虽然 chat 没问题。了，但是 index 不行了。首先无法加载到之前 index 的信息，然后一直卡在 setup indexing...
+
+再之后，我的 Trae 也无法打开 WSL 开发了，初始化都失败了。🥲
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250725164540.png"
+    src="/static/images/blog/Pasted image 20250725164540.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+总结： 这种方式只适用于 macos, linux, 或者只在 windows 里面开发， 不适用于 WSL。WSL 设置 mirrored network + tun 模式，有很多网络问题，我暂时无法解决。
+
+最后只能退回方式 1。
+
+## 为什么需要 Disable HTTP2
+
+一个更深层、也更可能的原因是 **QUIC 协议**。
+
+**什么是 QUIC？** QUIC 是 Google 开发的一个基于 UDP 的传输协议，它现在是 **HTTP/3** 的基础。它比基于 TCP 的 HTTP/2 更快，特别是在网络不稳定的情况下。
+
+**代理和 UDP**：传统的网页代理（HTTP/HTTPS Proxy）是为 **TCP 流量**设计的。它们通常**不会、也无法**处理 UDP 流量。
+
+**绕过行为**：Cursor/VS Code 的底层 Chromium 网络核心，会非常积极地尝试使用 QUIC (HTTP/3) 来提升性能。当它探测到目标服务器支持 QUIC 时，它会**直接通过 UDP 发起连接**。因为这个连接是 UDP 的，所以它**完全绕过了你的 TCP 代理**。
+
+而 Tun 模式是工作在 IP 层，它会接管整个系统的 TCP 和 UDP 流量。故没有因为 UDP 泄露了源 IP 地址。
+
+## Tun 模式下的流量路径
+
+TUN 模式的核心思想是在操作系统层面创建一个虚拟网卡（TUN Device），并修改系统路由表，将大部分网络流量都“骗”到这个虚拟网卡上，从而让 Clash 有机会在 IP 层面对所有应用的流量进行处理，而不仅仅是那些手动设置了代理的程序。
+
+这个过程大致可以分为以下几个关键步骤：
+
+### 1. 创建虚拟网卡 (TUN Device)
+
+当你按下 “TUN Mode” 开关时，Clash 会在你的 Windows 操作系统中注册并激活一个名为 “Clash Tunnel” (或类似名称) 的虚拟网络适配器。
+
+<div className="flex justify-center">
+  <Image
+    alt="Pasted image 20250725172859.png"
+    src="/static/images/blog/Pasted image 20250725172859.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
+
+### 2. 修改系统路由表
+
+这是 TUN 模式能够接管全局流量的**最关键一步**。Clash 会自动修改 Windows 的系统路由表（Routing Table），将网络流量以高优先级的方式流向 Clash Tunnel。
+
+我们查看下当前 windows 的路由表设置
+
+```text
+PS C:\Users\12451> route print
+===========================================================================
+Interface List
+ 51...........................Clash Tunnel
+ 14...2a 7b 11 62 fb 78 ......Microsoft Wi-Fi Direct Virtual Adapter
+ 13...2a 7b 11 62 eb 68 ......Microsoft Wi-Fi Direct Virtual Adapter #2
+  3...28 7b 11 62 db 58 ......MediaTek Wi-Fi 6E MT7902 Wireless LAN Card
+ 12...28 7b 11 62 db 59 ......Bluetooth Device (Personal Area Network)
+ 22...58 47 ca 7e ad b8 ......Realtek Gaming 2.5GbE Family Controller #2
+  1...........................Software Loopback Interface 1
+===========================================================================
+
+IPv4 Route Table
+===========================================================================
+Active Routes:
+Network Destination        Netmask          Gateway       Interface  Metric
+          0.0.0.0          0.0.0.0    10.68.247.254    10.68.246.163     45
+          1.0.0.0        255.0.0.0       198.18.0.2       198.18.0.1      0
+          2.0.0.0        254.0.0.0       198.18.0.2       198.18.0.1      0
+          4.0.0.0        252.0.0.0       198.18.0.2       198.18.0.1      0
+          8.0.0.0        248.0.0.0       198.18.0.2       198.18.0.1      0
+      10.68.246.0    255.255.254.0         On-link     10.68.246.163    301
+    10.68.246.163  255.255.255.255         On-link     10.68.246.163    301
+    10.68.247.255  255.255.255.255         On-link     10.68.246.163    301
+         16.0.0.0        240.0.0.0       198.18.0.2       198.18.0.1      0
+         32.0.0.0        224.0.0.0       198.18.0.2       198.18.0.1      0
+         64.0.0.0        192.0.0.0       198.18.0.2       198.18.0.1      0
+        127.0.0.0        255.0.0.0         On-link         127.0.0.1    331
+        127.0.0.1  255.255.255.255         On-link         127.0.0.1    331
+  127.255.255.255  255.255.255.255         On-link         127.0.0.1    331
+        128.0.0.0        128.0.0.0       198.18.0.2       198.18.0.1      0
+       198.18.0.0      255.255.0.0         On-link        198.18.0.1    256
+       198.18.0.1  255.255.255.255         On-link        198.18.0.1    256
+   198.18.255.255  255.255.255.255         On-link        198.18.0.1    256
+        224.0.0.0        240.0.0.0         On-link         127.0.0.1    331
+        224.0.0.0        240.0.0.0         On-link     10.68.246.163    301
+        224.0.0.0        240.0.0.0         On-link        198.18.0.1    256
+  255.255.255.255  255.255.255.255         On-link         127.0.0.1    331
+  255.255.255.255  255.255.255.255         On-link     10.68.246.163    301
+  255.255.255.255  255.255.255.255         On-link        198.18.0.1    256
+===========================================================================
+```
+
+#### Interface List (网络接口列表)
+
+这个部分列出了当前系统里面可用的网络适配器。
+
+**51...Clash Tunnel**: Clash 创建的虚拟网卡，它的 IP 地址是 198.18.0.1.
+**3...MediaTek Wi-Fi 6E...**: 系统真实的物理网卡，提供对外的 Internet 服务。IP 地址是10.68.246.163.
+
+#### IPv4 Route Table (IPv4 路由表)
+
+```text
+Network Destination        Netmask          Gateway       Interface  Metric
+          0.0.0.0          0.0.0.0    10.68.247.254    10.68.246.163     45
+```
+
+`0.0.0.0` 的这一条是系统的默认路由，但是它还不是主要的路由，因为他的 `Metric` 是 45， 优先级不是很高。
+
+```text
+Network Destination        Netmask          Gateway       Interface  Metric
+          1.0.0.0        255.0.0.0       198.18.0.2       198.18.0.1      0
+          2.0.0.0        254.0.0.0       198.18.0.2       198.18.0.1      0
+          4.0.0.0        252.0.0.0       198.18.0.2       198.18.0.1      0
+          8.0.0.0        248.0.0.0       198.18.0.2       198.18.0.1      0
+```
+
+这几条路由是 Clash 设置的，通过 `Destination` 和 `Netmask` 规则的设置，基本覆盖了所有的公网 IP 流量，让其走 `198.18.0.2`, 也就是我们的 Clash Tunnel 虚拟网卡。
+
+### 3. 完整的流量路径
+
+现在，我们来追踪一个数据包的完整旅程，假设你在浏览器中访问 `https://www.google.com`：
+
+1. **应用请求**: 浏览器发起对 `google.com` 的访问。首先，它需要解析域名，于是向系统配置的 DNS 服务器发起 DNS 查询。
+2. **DNS 劫持**: Clash 的 TUN 模式通常会配置一个“Fake-IP”模式的 DNS 服务。它会把自己伪装成系统的主要 DNS 服务器。所以浏览器的 DNS 请求直接被 Clash 捕获。Clash 返回一个 `198.18.x.x` 网段的假 IP 给浏览器，而不是 Google 的真实 IP。
+3. **IP 寻址**: 浏览器拿到这个假 IP 后，便开始向这个 IP 发起 TCP 连接请求。
+4. **路由决策**: 操作系统根据路由表，发现目标 IP（无论是 Fake-IP 还是真实 IP）的下一跳是 `198.18.0.1`（Clash 虚拟网卡）。于是，系统将这个 IP 数据包发送给了 Clash 虚拟网卡。
+5. **Clash 核心处理**: Clash 应用层一直在监听着这个虚拟网卡。当数据包到达时，Clash 读取其内容（目标域名或 IP、端口等信息）。
+6. **规则匹配与转发**:
+
+   - Clash 发现这个数据包是发往 `google.com`（通过 Fake-IP 映射关系得知）的。
+   - 它根据你的配置文件（`config.yaml`）中的规则，判断 `google.com` 需要走代理。
+   - Clash 于是通过你的**物理网卡**，与你在海外的代理服务器建立连接，并将原始的请求数据加密后发送过去。
+   - 最终，流量从你的代理服务器发往 `google.com`。
+
+通过这个流程，Clash 在 IP 层面上实现了对系统所有网络流量的“拦截”和“再分发“。

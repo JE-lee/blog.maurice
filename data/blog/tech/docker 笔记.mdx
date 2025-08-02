@@ -124,37 +124,43 @@ docker 启动后创建一个虚拟网桥 docker0，宿主机和容器都连接�
 
 docker 默认的网络模式就是 bridge 模式。虽然它比 host 模式更复杂，但是也更安全。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="docker bridge mode"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1598794931633-e13dedbf-d286-4be5-8ab5-4bd0ca7704c9.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
 如下图，在 ubuntu 中，宿主机有两个不同的网卡，eth0 是主机内网 ip 地址，而主机在 docker0 网桥上的地址是 172.17.0.1。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="docker host and bridge"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1598795356499-4e5062a6-9ae5-4339-bcf4-882dadce3122.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
 容器内的 IP：
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="container IP"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1598795372361-08f83bd7-109f-4b15-a4d4-596688800266.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

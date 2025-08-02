@@ -18,17 +18,30 @@ CLS (cumulative layout shift) 是一个用来衡量页面视觉稳定性的 web 
 在用户加载页面内容的过程中，用户的阅读体验和操作遭到打断，造成困惑，或者因为页面元素的突然跳动误点击。
 这些都会造成用户体验的下降，也影响网站的专业性和形象。
 
-<Image alt="CLS score bar" src="/static/images/tech/cls-score-bar.webp" width={1694} height={938} />
+<div className="relative flex max-h-[400px] max-w-full justify-center">
+  <Image
+    alt="CLS score bar"
+    src="/static/images/tech/cls-score-bar.webp"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
+  />
+</div>
 
 在下载 webfont 的过程中，浏览器会使用 fallback font 来渲染文本，等到 webfont 字体下载完成后，再切换为目标字体渲染。
 在这一过程中，用户先后看到的是由两种不同字体渲染的内容。不同的字体渲染所需要的空间是不一样的，这就会导致同样的文本前后渲染的大小是不一样的，从而影响页面中其他元素的布局，造成页面元素位置的突变。
 
-<div className="flex justify-center">
+<div className="relative flex max-h-[400px] max-w-full justify-center">
   <Image
     alt="cls caused by webfont"
     src="/static/gif/tech/cls-caused-by-webfont.gif"
-    width={494}
-    height={648}
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
   />
 </div>
 
@@ -43,12 +56,15 @@ CLS (cumulative layout shift) 是一个用来衡量页面视觉稳定性的 web 
 为什么两种不同的字体渲染相同的内容所需要的空间大小是不一样的？
 这和字体设计的参数指标有关系。不同字体的 `Ascent`, `Descent`, `CapHeight`, `xWidthAvg` 都是不一样的，因此渲染单个字符所需要的高度和宽度也是不一样的。
 
-<div className="flex justify-center">
+<div className="relative flex max-h-[400px] max-w-full justify-center">
   <Image
     alt="different font"
     src="/static/images/tech/different font.png"
-    width={1078}
-    height={570}
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
   />
 </div>
 
@@ -56,8 +72,16 @@ CLS (cumulative layout shift) 是一个用来衡量页面视觉稳定性的 web 
 
 Capsize 允许你查看一系列 webfont 如google font 的 metrics, 同时允许你从本地字体文件中获得 font metircs。
 
-<div className="flex justify-center">
-  <Image alt="Victor Mono measurements" src="/static/images/tech/Victo-Mono-measurements.png" width={1184} height={628} />
+<div className="relative max-h-[400px] max-w-full flex justify-center">
+  <Image 
+    alt="Victor Mono measurements" 
+    src="/static/images/tech/Victo-Mono-measurements.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 w-auto h-auto max-h-[400px] max-w-full"
+    style={{ objectFit: "contain" }}
+  />
 </div>
 ```js
 {
@@ -105,8 +129,16 @@ Capsize 允许你查看一系列 webfont 如google font 的 metrics, 同时允�
 
 2. 使用更相似的系统字体作为 fallback font。
 
-<div className="flex justify-center">
-  <Image alt="better fallback font" src="/static/images/tech/better-fallback-font.png" width={1184} height={628} />
+<div className="relative max-h-[400px] max-w-full flex justify-center">
+  <Image
+    alt="better fallback font"
+    src="/static/images/tech/better-fallback-font.png"
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 w-auto h-auto max-h-[400px] max-w-full"
+    style={{ objectFit: "contain" }}
+  />
 </div>
 
 这个网站[modernfontstacks.com](https://modernfontstacks.com/)收录了被各个操作系统都广泛支持的系统字体。
@@ -184,23 +216,29 @@ console.log('fontFaces: ', fontFaces)
 
 调整前的 CLS 为 0.029。因为我们的 demo 比较简单，所以这里 0.029 很小。但这不重要，我们主要关注前后的数值的变化。
 
-<div className="flex justify-center">
+<div className="relative flex max-h-[400px] max-w-full justify-center">
   <Image
     alt="courier-new-fallback-font"
     src="/static/images/tech/courier-new-fallback-font.png"
-    width={1184}
-    height={628}
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
   />
 </div>
 
 调整后的 CLS 为惊人的 0.001，这说明我们的优化是有效的。我们确实减轻了 webfont 造成的 CLS 影响。
 
-<div className="flex justify-center">
+<div className="relative flex max-h-[400px] max-w-full justify-center">
   <Image
     alt="courier-new-fallback-font"
     src="/static/images/tech/victor-mono-fallback-font.png"
-    width={1184}
-    height={628}
+    width={0}
+    height={0}
+    sizes="100vw"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
+    style={{ objectFit: 'contain' }}
   />
 </div>
 

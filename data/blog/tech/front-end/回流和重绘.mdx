@@ -17,13 +17,15 @@ summary: 网页性能瓶颈主要源于回流和重绘，优化方法包括简�
 
 在说明回流和重绘之前，我们需要了解浏览器的像素管道(pixel pipeline)
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="pixel pipe"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597588808903-be535b7b-1178-48b7-b91a-72c8a2f1bd06.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -125,25 +127,29 @@ function resizeAllParagraphsToMatchBlockWidth() {
 
 使用 will-change: transform 提升层，当运用 transform 动画的时候
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="pixel pipe"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1604932910448-e1b7a6ee-407a-498c-a6da-f78940fd9a38.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
 而使用 transform: translateZ(0) 来提升的层，会多异步 Paint
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="pixel pipe"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1604932867624-4c3d2873-4ecc-4e0b-852e-20a60f3baf6a.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

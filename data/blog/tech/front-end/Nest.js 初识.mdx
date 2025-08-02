@@ -16,13 +16,15 @@ NestJS 通过依赖注入(DI)的方式来管理`module` `controller` `service` �
 
 被 NestJS DI 系统接管的 class (被 `@Injectable` 修饰) ，都有相同的生命周期。他们在初始化和销毁的过程中，其生命周期顺序是这样的。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2023/png/438262/1698330784913-9f123775-0f70-4ab3-94f8-4e729e901a46.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>{' '}
 
@@ -173,13 +175,15 @@ Scope.TRANSIENT 不会冒泡，不会影响上一级模块的 scope。
 
 ### 各个切面的协作过程
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2023/png/438262/1698330855428-72aa3e51-d2a7-46eb-a603-c6052341283c.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>{' '}
 

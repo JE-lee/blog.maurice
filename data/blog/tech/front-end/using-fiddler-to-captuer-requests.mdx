@@ -16,13 +16,15 @@ summary: Fiddler是一款用于捕获和分析HTTP(S)请求的调试代理工具
 
 打开Fiddler软件，将会**自动设置**你系统的代理为localhost:8888，这是Fiddler的默认端口。然后点击File --> Capture traffic 开始进行抓包。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583205797184-c1345731-4842-4445-bb33-aa060b3218bf.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -30,13 +32,15 @@ summary: Fiddler是一款用于捕获和分析HTTP(S)请求的调试代理工具
 
 点击左侧session列表中的某个请求，然后在右侧的操作区中点击Inspectors。上面为request的信息，下面为response的信息。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583206075501-4ddb2243-7ca5-466e-ae57-da8dbdef4add.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -44,13 +48,15 @@ summary: Fiddler是一款用于捕获和分析HTTP(S)请求的调试代理工具
 
 对于响应头设置了gzip的请求，可以在response区域的Transformer 中切换HTTP compression 为none
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583206578783-70b92185-44bf-4c14-ae60-0f156b6997ec.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -58,13 +64,15 @@ summary: Fiddler是一款用于捕获和分析HTTP(S)请求的调试代理工具
 
 在顶部菜单栏的Tool --> options 中，选择HTTPS，勾选以下两个选项
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583206734282-959d2b72-2ba8-4555-bc36-3a8f8f41044f.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -74,13 +82,15 @@ summary: Fiddler是一款用于捕获和分析HTTP(S)请求的调试代理工具
 
 在右侧的菜单区域，有一个AutoResponser, 我们可以**针对特定的请求配置特定的响应规则**。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583207019031-7c5dfd5c-a7d4-4569-821f-b82f246cee43.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -108,13 +118,15 @@ matche
 
 ## session 图标
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/webp/438262/1583207603403-2eec177b-8ed6-4b10-bcd8-09cf9920244b.webp"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -122,24 +134,28 @@ matche
 
 1. 确保手机端和PC在同一个局域网内。
 2. 手机端访问PC 局域网ip的8888端口，下载证书。
-3. <div className="relative h-[400px]">
+3. <div className="relative max-h-[400px] max-w-full">
      <Image
        style={{ objectFit: 'contain' }}
-       className="my-0"
+       className="my-0 h-auto max-h-[400px] w-auto max-w-full"
        alt="fiddler screenshot"
        src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583207747768-1c1eef42-9b09-4e19-9de4-e5aed9c8bc8b.png"
-       fill={true}
+       width={0}
+       height={0}
+       sizes="100vw"
      />
    </div>
 4. 在手机上安装证书后，设置你的wifi 代理。服务器主机名为PC 端的局域网ip，端口号为Fiddler软件的监听端口，一般默认是8888。
 5. 勾选Fiddler Connections中的 允许远程连接
-   <div className="relative h-[400px]">
+   <div className="relative max-h-[400px] max-w-full">
      <Image
        style={{ objectFit: 'contain' }}
-       className="my-0"
+       className="my-0 h-auto max-h-[400px] w-auto max-w-full"
        alt="fiddler screenshot"
        src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583207939421-437059d0-ab47-4430-8526-bcf6f39c1c3f.png"
-       fill={true}
+       width={0}
+       height={0}
+       sizes="100vw"
      />
    </div>
 6. 重启Fiddler, 就可以抓包手机端的请求了。
@@ -148,13 +164,15 @@ matche
 
 在session列表中，经常有一些请求的host 为 Tunnel to。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1583209674512-720712b1-f5d7-4f6f-9f0f-9c48a520a437.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

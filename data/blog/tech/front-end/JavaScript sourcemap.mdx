@@ -100,13 +100,15 @@ mappings: 'AAAAA,BBBBB;CCCCC'
 
 **mappings 中位置坐标是相对的，即位置中的数值表示相对于前一个位置偏移了多少(vlq 可以表示正负数)**
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2022/png/438262/1646878337098-d88460d7-1f5e-4bef-a543-928c25fdf493.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
@@ -114,13 +116,15 @@ mappings: 'AAAAA,BBBBB;CCCCC'
 
 vlq 编码的特点就是可以精简表示非常大的数值，节省数据的传输大小。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2022/png/438262/1646878055010-7ccb9010-09d0-4da2-acbe-a3b18e10d7c9.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

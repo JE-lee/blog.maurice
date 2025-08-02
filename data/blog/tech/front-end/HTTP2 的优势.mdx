@@ -38,13 +38,15 @@ summary: HTTP2通过多路复用、首部压缩、服务端推送等特性，显
 
 在HTTP/2中，数据都被拆分成了帧，在客户端或者服务端中，通过帧信息来重新组合一个请求的完整数据。这就解决了上述的问题。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1595516305768-80a8b3af-4cfe-4549-b7ca-ec4fc36bd76b.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 

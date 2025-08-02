@@ -12,13 +12,15 @@ summary: 在 Nest.js 中，通过 Middleware 记录请求日志，Interceptor �
 
 从下面的 NestJS 的各个切面执行顺序可知，对于请求的 log 可以在 `Middleware`中记录，而对于响应的 log 则可以在 `Interceptor`和 `Exception Filter`中记录。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="fiddler screenshot"
     src="https://cdn.nlark.com/yuque/0/2023/png/438262/1698330855428-72aa3e51-d2a7-46eb-a603-c6052341283c.png?x-oss-process=image%2Fformat%2Cwebp"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>{' '}
 

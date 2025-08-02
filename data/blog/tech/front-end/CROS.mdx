@@ -63,13 +63,15 @@ IE10+，FF3.5+, safari 4+ ,chrome都通过XMLHttpRequest 对象实现了CORS的�
 
 即使你设置了widthCredentials 为true,也有可能会发生无法写入跨域cookie的情况。原因是浏览器设置可以让你禁用掉第三方cookie。当浏览器禁用掉第三方cookie之后，那么采用cookie验证登录的技术也将不能使用，当然这个前提是你跨域请求登录。
 
-<div className="relative h-[400px]">
+<div className="relative max-h-[400px] max-w-full">
   <Image
     style={{ objectFit: 'contain' }}
-    className="my-0"
+    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
     alt="pixel pipe"
     src="https://cdn.nlark.com/yuque/0/2020/png/438262/1597588685398-ac67cea0-4e66-479a-8018-ae3b4e373a73.png"
-    fill={true}
+    width={0}
+    height={0}
+    sizes="100vw"
   />
 </div>
 
