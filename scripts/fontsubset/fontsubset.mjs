@@ -15,8 +15,7 @@ async function subsetFont() {
   console.log(chalk.blue('Font subset started...'))
   const charSet = new Set()
   // Read all files in the store
-  const files = await glob([store + '/**/*'])
-
+  const files = await glob(['**/*'], { cwd: store, absolute: true })
   files.forEach((file) => {
     const content = fs.readFileSync(file, 'utf8')
     // Add each character to the set

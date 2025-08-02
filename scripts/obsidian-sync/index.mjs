@@ -29,10 +29,11 @@ async function copyBlog(blog) {
   let raw = await fs.readFile(blog, 'utf8')
   raw = await maybeAddFrontmatter(raw, blog)
   raw = await convertObsidianImages(raw)
+  raw = await convertExternalImages(raw)
 
   const dest = getBlogDest(blog)
   await fs.ensureDir(path.dirname(dest))
-  raw = await prettier.format(raw, { ...prettierConfig, parser: 'markdown' })
+  raw = await prettier.format(raw, { ...prettierConfig, parser: 'mdx' })
   await fs.writeFile(dest, raw, { encoding: 'utf8' })
 }
 
@@ -51,12 +52,27 @@ async function convertObsidianImages(raw) {
   let obsidianImage
   while ((obsidianImage = reg.exec(raw))) {
     const img = path.resolve(OBSIDIAN_VAULT, 'attachements', obsidianImage[1])
-    const blogImg = copyImage(img)
+    const blogImgPath = copyImage(img)
     raw = removeRaw(raw, obsidianImage.index, obsidianImage[0].length)
-    const nextImage = await generateNextImage(blogImg)
+    let blogImgUri = path.relative(path.resolve(import.meta.dirname, '../../public'), blogImgPath)
+    blogImgUri = path.join('/', blogImgUri)
+    // 考虑 windows 和 linux 的兼容性
+    blogImgUri = path.posix.normalize(blogImgUri.replace(/\\/g, '/'))
+    const nextImage = generateNextImage(blogImgUri)
     raw = insertToRaw(raw, nextImage, obsidianImage.index)
   }
 
+  return raw
+}
+
+async function convertExternalImages(raw) {
+  const reg = /!\[.*\]\((.*)\)/g
+  let externalImage
+  while ((externalImage = reg.exec(raw)) !== null) {
+    const url = externalImage[1]
+    raw = removeRaw(raw, externalImage.index, externalImage[0].length)
+    raw = insertToRaw(raw, generateNextImage(url), externalImage.index)
+  }
   return raw
 }
 
@@ -77,16 +93,14 @@ function insertToRaw(raw, insertion, index) {
   return raw.slice(0, index) + insertion + raw.slice(index)
 }
 
-async function generateNextImage(image) {
-  let src = path.relative(path.resolve(import.meta.dirname, '../../public'), image)
-  src = path.join('/', src)
-  src = path.posix.normalize(src.replace(/\\/g, '/'))
-
+function generateNextImage(uri) {
+  const fullname = uri.split('?')[0].split('/').pop()
+  const basename = fullname.split('.').slice(0, -1).join('.')
   const nextImage = `
 <div className="flex justify-center">
   <Image
-    alt="${path.basename(image)}"
-    src="${src}"
+    alt="${basename}"
+    src="${uri}"
     width={0}
     height={0}
     sizes="100vw"
