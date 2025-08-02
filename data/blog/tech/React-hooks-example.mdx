@@ -61,16 +61,10 @@ React.useEffect(() => {
 +  });
 ```
 
-<font style="color:rgb(31, 35, 40);">By calling </font>_
-<font style="color:rgb(31, 35, 40);">React.useEffect</font>_
-<font style="color:rgb(31, 35, 40);"> without a second parameter, the code inside </font>_
-<font style="color:rgb(31, 35, 40);">useEffect</font>_
-<font style="color:rgb(31, 35, 40);"> will be triggered right when the component is </font>**
-<font style="color:rgb(31, 35, 40);">just mounted and on any update</font>**
-<font style="color:rgb(31, 35, 40);">
-  {' '}
-  (clean up function will be called right before the effect is triggered again)
-</font>
+By calling React.useEffect without a second parameter, the code inside useEffectwill be triggered right when the component is **
+just mounted and on any update**
+
+(clean up function will be called right before the effect is triggered again)
 
 ## 06 ajax field change
 
@@ -92,7 +86,7 @@ export const MyComponent = () => {
 
 ## 07 custom hook
 
-<font style="color:rgb(31, 35, 40);">reuse logic across multiple components</font>
+reuse logic across multiple components
 
 ## 08 Pure components
 
@@ -122,17 +116,10 @@ share global data across the deep component tree.
 
 ## 12 set state func
 
-<font style="color:rgb(31, 35, 40);">
-  An important issue to consider with hooks and functional components is that the functions are
-  executed once and die ( hooks serve as data stores among other things), but if we make an
-  asynchronous call, the{' '}
-</font>
-<font style="color:rgb(93, 43, 230) !important;">closure</font>
-<font style="color:rgb(31, 35, 40);">
-  {' '}
-  principle will be applied and if we need to retrieve any state data it will just hold a frozen
-  value from the past.
-</font>
+An important issue to consider with hooks and functional components is that the functions are
+executed once and die ( hooks serve as data stores among other things), but if we make an
+asynchronous call, the closure principle will be applied and if we need to retrieve any state data it will just hold a frozen
+value from the past.
 
 ## 13 async closure
 
@@ -147,18 +134,14 @@ export function MyComponent() {
 
 ## 15 promise unmounted
 
-> _<font style="color:rgb(31, 35, 40);">Warning: In React you cannot update the status of a dismounted component. It is a no-op, but it is an </font>**<font style="color:rgb(93, 43, 230) !important;">indication</font>**<font style="color:rgb(31, 35, 40);"> of a memory leak in your application. To fix this, cancel all subscriptions and asynchronous tasks in a cleanup function in a useEffect.</font>_
+> \_Warning: In React you cannot update the status of a dismounted component. It is a no-op, but it is an **indication** of a memory leak in your application. To fix this, cancel all subscriptions and asynchronous tasks in a cleanup function in a useEffect.
 
-<font style="color:rgb(54, 45, 89);">
-  You can ignore the warning if setting the state on an unmounted component does not cause a memory
-  leak, like when setting the state after a fetch request promise is resolved.
-</font>
+You can ignore the warning if setting the state on an unmounted component does not cause a memory
+leak, like when setting the state after a fetch request promise is resolved.
 
 ## 16 memo predicated
 
-<font style="color:rgb(54, 45, 89);">
-  The second argument in React.memo indicates whether the component should be updated.
-</font>
+The second argument in React.memo indicates whether the component should be updated.
 
 ## 17 use debug value
 
