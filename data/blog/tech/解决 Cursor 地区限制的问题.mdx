@@ -1,12 +1,12 @@
 ---
 title: 解决 Cursor 地区限制的问题
-date: 2025-07-12
-lastmod: 2025-08-02T05:06:45.956Z
+date: 2025-07-25
+lastmod: 2025-08-02T14:03:18.255Z
 tags:
   - 开发环境
   - 前端性能优化
   - 新技术趋势
-summary: 由于Cursor限制，中国大陆IP无法使用大模型，作者分享了两种绕过方法，但在WSL中遇到问题。
+summary: Cursor 限制中国大陆 IP 使用大模型，用户体验下降。提供两种绕过检测的方法，分别为 HTTP 代理和 TUN 模式。
 draft: false
 images: []
 ---
@@ -98,26 +98,6 @@ Cursor 限制地区后，来自中国大陆的 IP 流量一律不能使用 Gemin
 
 3. 重启 WSL。 wsl --shutdown
 4. 验证模型是否可用，选择一个 Claude 的模型进行 chat，发现没问题。
-
-本以为这样子就万事大吉了，但是我发现虽然 chat 没问题。了，但是 index 不行了。首先无法加载到之前 index 的信息，然后一直卡在 setup indexing...
-
-再之后，我的 Trae 也无法打开 WSL 开发了，初始化都失败了。🥲
-
-<div className="flex justify-center">
-  <Image
-    alt="Pasted image 20250725164540.png"
-    src="/static/images/blog/Pasted image 20250725164540.png"
-    width={0}
-    height={0}
-    sizes="100vw"
-    className="my-0 h-auto max-h-[400px] w-auto max-w-full"
-    style={{ objectFit: 'contain' }}
-  />
-</div>
-
-总结： 这种方式只适用于 macos, linux, 或者只在 windows 里面开发， 不适用于 WSL。WSL 设置 mirrored network + tun 模式，有很多网络问题，我暂时无法解决。
-
-最后只能退回方式 1。
 
 ## 为什么需要 Disable HTTP2
 

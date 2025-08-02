@@ -6,6 +6,7 @@ import { generateSummary } from './generate-summary.mjs'
 import { configDotenv } from 'dotenv'
 import yaml from 'yaml'
 import prettier from 'prettier'
+import prettierConfig from '../../prettier.config.js'
 
 configDotenv({ path: path.resolve(import.meta.dirname, '../../.env.local') })
 
@@ -31,7 +32,7 @@ async function copyBlog(blog) {
 
   const dest = getBlogDest(blog)
   await fs.ensureDir(path.dirname(dest))
-  raw = await prettier.format(raw, { parser: 'markdown' })
+  raw = await prettier.format(raw, { ...prettierConfig, parser: 'markdown' })
   await fs.writeFile(dest, raw, { encoding: 'utf8' })
 }
 
@@ -79,6 +80,7 @@ function insertToRaw(raw, insertion, index) {
 async function generateNextImage(image) {
   let src = path.relative(path.resolve(import.meta.dirname, '../../public'), image)
   src = path.join('/', src)
+  src = path.posix.normalize(src.replace(/\\/g, '/'))
 
   const nextImage = `
 <div className="flex justify-center">
@@ -135,7 +137,7 @@ ${yaml.stringify(destFileFrontMatter)}
   const summary = await generateSummary(raw)
   const frontmatter = {
     title: path.basename(blogPath, path.extname(blogPath)),
-    date: frontmatterFromRaw.date || fsStat.birthtime.toISOString().split('T')[0],
+    date: frontmatterFromRaw?.date || fsStat.birthtime.toISOString().split('T')[0],
     lastmod: lastmod,
     tags: tags,
     summary: summary,

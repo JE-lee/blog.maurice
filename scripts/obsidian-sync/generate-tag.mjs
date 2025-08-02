@@ -60,9 +60,7 @@ async function generateTags(content) {
     model: process.env.OPENAI_MODEL,
   })
   const chain = prompt.pipe(model)
-  console.log('start invoke', process.env.OPENAI_MODEL)
   const response = await chain.invoke({ content })
-  console.log('end invoke', response)
 
   return response.content.split(',').map((tag) => tag.trim())
 }

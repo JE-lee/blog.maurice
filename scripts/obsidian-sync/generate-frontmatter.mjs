@@ -33,9 +33,7 @@ async function generate(dir) {
 async function generateFile(file) {
   const content = await readFile(file, { encoding: 'utf8' })
   const tags = await generateTags(content)
-  console.log('Tags:', tags)
   const summary = await generateSummary(content)
-  console.log('Summary:', summary)
   let newContent = content
 
   if (content.startsWith('---')) {
